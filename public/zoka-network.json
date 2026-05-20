@@ -1,0 +1,11 @@
+{
+  "active_network": "mainnet",
+  "networks": [
+    {
+      "id": "mainnet",
+      "label": "Mainnet",
+      "version": "v0.1.0",
+      "rpc_url": "https://zoka-bootstrap-zokachain.fly.dev"
+    }
+  ]
+}
