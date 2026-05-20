@@ -2,7 +2,7 @@ import { Github, Twitter } from "lucide-react";
 
 const SiteFooter = () => (
   <footer className="relative z-10 mx-auto max-w-5xl px-6 pb-10">
-    <div className="flex flex-col items-center justify-between gap-3 border-t border-border pt-6 text-[11px] text-muted-foreground sm:flex-row">
+    <div className="flex flex-col items-center justify-between gap-3 text-[11px] text-muted-foreground sm:flex-row">
       <span>© {new Date().getFullYear()} zokaexplorer</span>
       <div className="flex items-center gap-3">
         <a
