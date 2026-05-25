@@ -31,8 +31,9 @@ const envRpcUrl =
 const NETWORKS: Record<NetworkId, NetworkConfig> = {
   mainnet: {
     id: "mainnet",
-    label: "Mainnet",
+    label: "Pre-Mainnet",
     version: "v0.1.0",
+    badge: "Official mainnet launches 2026-06-30",
     rpcUrl: envRpcUrl,
     get useMock() {
       return !this.rpcUrl;
