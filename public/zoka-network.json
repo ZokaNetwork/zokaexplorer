@@ -3,10 +3,9 @@
   "networks": [
     {
       "id": "mainnet",
-      "label": "Pre-Mainnet",
-      "badge": "Official mainnet launches 2026-06-30",
-      "version": "v0.1.0",
-      "rpc_url": "https://zoka-bootstrap-zokachain.fly.dev"
+      "label": "Mainnet",
+      "version": "v1.0.0",
+      "rpc_url": "/rpc"
     }
   ]
 }
