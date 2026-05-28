@@ -23,10 +23,11 @@ type RuntimeConfig = {
   networks?: RuntimeNetwork[];
 };
 
-const envRpcUrl =
-  import.meta.env.VITE_RPC_URL_MAINNET ||
-  import.meta.env.VITE_RPC_URL ||
-  (import.meta.env.DEV ? "/rpc" : "");
+// In production always route through the Vercel proxy (/rpc → RPC node).
+// In dev, honour VITE_RPC_URL_MAINNET or fall back to the vite proxy.
+const envRpcUrl = import.meta.env.DEV
+  ? (import.meta.env.VITE_RPC_URL_MAINNET || import.meta.env.VITE_RPC_URL || "/rpc")
+  : "/rpc";
 
 const NETWORKS: Record<NetworkId, NetworkConfig> = {
   mainnet: {
