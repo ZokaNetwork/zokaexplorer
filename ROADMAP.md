@@ -65,11 +65,11 @@ is today.
       hashrate, emission/supply and miners online. Connected peers / network
       version are available but left off the home to keep it clean (candidate
       for the footer later).
-- [ ] **B6** Mempool view — deferred: the public mempool is ~always empty on a
-      private chain and the private pending count is usually 0; low value vs the
-      Recent-private-activity feed that replaced it.
-- [ ] **B4** Average block time (computed from recent block timestamps) — nice
-      to add later without cluttering (candidate to replace/extend a metric).
+- [x] **B6** Mempool pending strip (`/mempool/metrics` + `/private/pending`,
+      counts only). Shows "N private · M public" and only appears when something
+      is actually pending, so it never clutters the home when empty.
+- [x] **B4** Average block time, derived from the spread of recent block
+      timestamps, shown in the "Latest blocks" header ("~Xs avg") — no extra tile.
 
 ## Phase 4 — Private-tx transparency
 

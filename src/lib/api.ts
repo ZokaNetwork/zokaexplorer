@@ -229,6 +229,28 @@ export async function getNetworkStats(): Promise<NetworkStats> {
 // Note: the home page builds its own metric sparklines by accumulating real
 // /stats samples over time, so there is no fabricated metric-history endpoint.
 
+// ── Mempool ─────────────────────────────────────────────────────
+// Pending counts only. The public mempool is ~always empty on a private
+// chain; the private count is a bare number (no amounts/parties leaked).
+
+export async function getMempoolInfo(): Promise<{ publicPending: number; privatePending: number }> {
+  await ensureNetworkConfigLoaded();
+  if (config.useMock) return { publicPending: 0, privatePending: 0 };
+  let publicPending = 0;
+  let privatePending = 0;
+  try {
+    const m = await apiFetch<{ current_size?: number; size?: number; pending_transactions?: number }>(
+      "/mempool/metrics",
+    );
+    publicPending = m.current_size ?? m.size ?? m.pending_transactions ?? 0;
+  } catch { /* optional */ }
+  try {
+    const p = await apiFetch<{ count?: number }>("/private/pending");
+    privatePending = p.count ?? 0;
+  } catch { /* optional */ }
+  return { publicPending, privatePending };
+}
+
 // ── Blocks ──────────────────────────────────────────────────────
 
 export async function getBlock(heightOrHash: string | number): Promise<Block | null> {

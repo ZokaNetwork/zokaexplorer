@@ -18,6 +18,7 @@ import SiteFooter from "@/components/SiteFooter";
 import MetricSparkline from "@/components/MetricSparkline";
 import { getActiveNetwork, getNetworkConfig, onNetworkChange } from "@/lib/config";
 import {
+  getMempoolInfo,
   getNetworkStats,
   getRecentBlocks,
   getRecentPrivateActivity,
@@ -73,6 +74,7 @@ const Index = () => {
   const [stats, setStats] = useState<NetworkStats | null>(null);
   const [recentBlocks, setRecentBlocks] = useState<ChainBlock[]>([]);
   const [privateActivity, setPrivateActivity] = useState<PrivateActivityItem[]>([]);
+  const [mempool, setMempool] = useState({ publicPending: 0, privatePending: 0 });
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
@@ -97,14 +99,16 @@ const Index = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [sample, blocks, activity] = await Promise.all([
+        const [sample, blocks, activity, mem] = await Promise.all([
           getNetworkStats(),
           getRecentBlocks(5),
           getRecentPrivateActivity(6).catch(() => [] as PrivateActivityItem[]),
+          getMempoolInfo().catch(() => ({ publicPending: 0, privatePending: 0 })),
         ]);
         setStats(sample);
         setRecentBlocks(blocks);
         setPrivateActivity(activity);
+        setMempool(mem);
         const h = historyRef.current;
         const push = (key: keyof typeof h, value: number) => {
           h[key] = [...h[key].slice(-HISTORY_LEN + 1), value];
@@ -289,6 +293,14 @@ const Index = () => {
   ];
   const activeNetwork = getNetworkConfig();
 
+  // B4: average block time, derived from the spread of recent block timestamps.
+  const avgBlockSecs = (() => {
+    const ts = recentBlocks.map((b) => b.timestamp).filter((t) => t > 0).sort((a, b) => b - a);
+    if (ts.length < 2) return null;
+    return Math.round((ts[0] - ts[ts.length - 1]) / 1000 / (ts.length - 1));
+  })();
+  const pendingTotal = mempool.publicPending + mempool.privatePending;
+
   return (
     <main className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
       <div className="pointer-events-none absolute inset-0 bg-grid opacity-40" aria-hidden />
@@ -399,6 +411,20 @@ const Index = () => {
         </div>
       </section>
 
+      {pendingTotal > 0 && (
+        <section className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-2">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-card/60 px-4 py-2.5 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-2 uppercase tracking-[0.16em]">
+              <Clock3 className="h-3 w-3 text-yellow-500/70" /> Mempool · pending
+            </span>
+            <span className="font-mono-tight">
+              {mempool.privatePending} private
+              {mempool.publicPending > 0 ? ` · ${mempool.publicPending} public` : ""}
+            </span>
+          </div>
+        </section>
+      )}
+
       {privateActivity.length > 0 && (
         <section className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-6">
           <div className="flex items-center justify-between border-b border-border pb-2">
@@ -434,7 +460,7 @@ const Index = () => {
             Latest blocks
           </div>
           <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-            privacy-safe
+            {avgBlockSecs != null ? `~${avgBlockSecs}s avg · ` : ""}privacy-safe
           </div>
         </div>
         <div className="divide-y divide-border">
