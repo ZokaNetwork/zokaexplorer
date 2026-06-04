@@ -106,6 +106,8 @@ interface NodeBlock {
   reward_zka?: number | string;
   difficulty?: number;
   difficulty_bits?: number;
+  private_tx_count?: number;
+  private_nullifier_count?: number;
 }
 
 interface NodeBlockTx {
@@ -330,6 +332,8 @@ export async function getBlock(heightOrHash: string | number): Promise<Block | n
       minerAddress: "",
       transactions: txHashes,
       privateTransactions: privateTxHashes,
+      privateTxCount: raw.private_tx_count ?? privateTxHashes.length,
+      privateNullifierCount: raw.private_nullifier_count ?? 0,
     };
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) {

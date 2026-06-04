@@ -31,6 +31,7 @@ export interface Block {
   transactions: string[];  // tx hashes
   privateTransactions?: string[]; // privacy-safe private tx hashes
   privateTxCount?: number; // count when hashes aren't fetched (list views)
+  privateNullifierCount?: number; // anchored double-spend proofs (count only)
 }
 
 // A privacy-safe pointer to a private tx anchored in a block. Only the hash

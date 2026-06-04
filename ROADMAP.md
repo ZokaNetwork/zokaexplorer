@@ -74,9 +74,10 @@ is today.
 ## Phase 4 — Private-tx transparency
 
 - [x] **B8** "Recent private activity" feed shipped (see A3).
-- [ ] **B7** Nullifier count per block — **needs a node change**: `/blocks/{h}`
-      does not yet serialize the block's `private_nullifiers`. Defer until the
-      node exposes them; then show the count (privacy-safe).
+- [x] **B7** Nullifier count per block. Node now serializes
+      `private_nullifier_count` in `/blocks/{h}` (count only — nullifiers are an
+      anchored, owner-less double-spend proof). `BlockDetail` shows it when > 0.
+      Live data appears once the node is redeployed with the change.
 
 ---
 

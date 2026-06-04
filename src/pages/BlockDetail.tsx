@@ -132,6 +132,9 @@ const BlockDetail = () => {
               <Field label="Timestamp" value={new Date(block.timestamp).toUTCString()} />
               {block.nonce > 0 && <Field label="Nonce" value={block.nonce.toLocaleString()} mono />}
               <Field label="Miner" value={<span className="inline-flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground" />Private coinbase (shielded miner)</span>} />
+              {(block.privateNullifierCount ?? 0) > 0 && (
+                <Field label="Nullifiers" value={`${block.privateNullifierCount?.toLocaleString()} anchored · double-spend proof`} />
+              )}
             </div>
 
             <div className="mt-6 rounded-xl border border-border bg-card">
