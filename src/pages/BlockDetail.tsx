@@ -131,7 +131,7 @@ const BlockDetail = () => {
               {block.previousHash && <Field label="Previous Hash" value={truncate(block.previousHash, 14, 10)} mono copyable />}
               <Field label="Timestamp" value={new Date(block.timestamp).toUTCString()} />
               {block.nonce > 0 && <Field label="Nonce" value={block.nonce.toLocaleString()} mono />}
-              <Field label="Miner" value={<span className="inline-flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground" />shielded</span>} />
+              <Field label="Miner" value={<span className="inline-flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground" />Private coinbase (shielded miner)</span>} />
             </div>
 
             <div className="mt-6 rounded-xl border border-border bg-card">

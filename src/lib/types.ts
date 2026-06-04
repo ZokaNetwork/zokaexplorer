@@ -30,6 +30,14 @@ export interface Block {
   minerAddress: string;
   transactions: string[];  // tx hashes
   privateTransactions?: string[]; // privacy-safe private tx hashes
+  privateTxCount?: number; // count when hashes aren't fetched (list views)
+}
+
+// A privacy-safe pointer to a private tx anchored in a block. Only the hash
+// and the block it landed in are public — never amounts, parties or owners.
+export interface PrivateActivityItem {
+  hash: string;
+  blockHeight: number;
 }
 
 export interface Transaction {

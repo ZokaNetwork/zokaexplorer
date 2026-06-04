@@ -12,8 +12,7 @@ import type {
   SearchResult,
   SafeRecord,
   SafeRecordKind,
-  MetricKey,
-  MetricDataPoint,
+  PrivateActivityItem,
 } from "./types";
 
 // ── Network layer with retries ──────────────────────────────────
@@ -227,36 +226,8 @@ export async function getNetworkStats(): Promise<NetworkStats> {
   };
 }
 
-// ── Metric history ──────────────────────────────────────────────
-// Node doesn't expose historical metric series; always returns mock shapes
-// seeded from the current live height when available.
-
-export async function getMetricHistory(
-  metric: MetricKey,
-  points = 30,
-): Promise<MetricDataPoint[]> {
-  await ensureNetworkConfigLoaded();
-  await delay();
-  let baseHeight = 482900;
-  if (!config.useMock) {
-    try {
-      const h = await apiFetch<{ height: number }>("/chain/height");
-      baseHeight = Math.max(0, h.height - points);
-    } catch { /* fallback to default */ }
-  }
-  const bases: Record<MetricKey, number> = {
-    height: baseHeight,
-    difficulty: 18432,
-    hashrate: 312,
-    emission: 18421000,
-    miners: 0,
-  };
-  const now = Date.now();
-  return Array.from({ length: points }, (_, i) => ({
-    timestamp: now - (points - i) * 60000,
-    value: bases[metric] + Math.sin(i * 0.3) * 10 + i,
-  }));
-}
+// Note: the home page builds its own metric sparklines by accumulating real
+// /stats samples over time, so there is no fabricated metric-history endpoint.
 
 // ── Blocks ──────────────────────────────────────────────────────
 
@@ -365,6 +336,18 @@ export async function getRecentBlocks(count = 10): Promise<Block[]> {
     blocks: Array<{ hash: string; height: number; timestamp: number }>;
   }>(`/blocks/range/${from}/${height}`);
 
+  // One extra call gives the private-tx count per block (hashes only, never
+  // contents) so the list can flag private activity without N block fetches.
+  const privateCountByHeight: Record<number, number> = {};
+  try {
+    const priv = await apiFetch<{
+      blocks?: Array<{ height: number; private_tx_count?: number; private_tx_hashes?: string[] }>;
+    }>(`/blocks/range/${from}/${height}/private_tx_hashes`);
+    for (const b of priv.blocks ?? []) {
+      privateCountByHeight[b.height] = b.private_tx_count ?? b.private_tx_hashes?.length ?? 0;
+    }
+  } catch { /* private counts are optional */ }
+
   return raw.blocks
     .slice()
     .reverse()
@@ -381,7 +364,31 @@ export async function getRecentBlocks(count = 10): Promise<Block[]> {
       minerAddress: "",
       transactions: [],
       privateTransactions: [],
+      privateTxCount: privateCountByHeight[b.height] ?? 0,
     }));
+}
+
+// Recent private-tx activity: hashes anchored in recent blocks, newest first.
+// Privacy-safe — exposes only the hash and the block it landed in, never
+// amounts, parties or owners.
+export async function getRecentPrivateActivity(count = 8): Promise<PrivateActivityItem[]> {
+  await ensureNetworkConfigLoaded();
+  if (config.useMock) return [];
+  const { height } = await apiFetch<{ height: number }>("/chain/height");
+  if (height === 0) return [];
+  const lookback = 64;
+  const from = Math.max(0, height - lookback + 1);
+  const priv = await apiFetch<{
+    blocks?: Array<{ height: number; private_tx_hashes?: string[] }>;
+  }>(`/blocks/range/${from}/${height}/private_tx_hashes`);
+  const items: PrivateActivityItem[] = [];
+  for (const b of (priv.blocks ?? []).slice().reverse()) {
+    for (const hash of b.private_tx_hashes ?? []) {
+      items.push({ hash, blockHeight: b.height });
+      if (items.length >= count) return items;
+    }
+  }
+  return items;
 }
 
 // ── Transactions ────────────────────────────────────────────────

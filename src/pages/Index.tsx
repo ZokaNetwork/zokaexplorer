@@ -20,12 +20,12 @@ import { getActiveNetwork, getNetworkConfig, onNetworkChange } from "@/lib/confi
 import {
   getNetworkStats,
   getRecentBlocks,
-  getRecentTransactions,
+  getRecentPrivateActivity,
   getSuggestions,
   search,
   type SearchSuggestion,
 } from "@/lib/api";
-import type { Block as ChainBlock, NetworkStats, Transaction } from "@/lib/types";
+import type { Block as ChainBlock, NetworkStats, PrivateActivityItem } from "@/lib/types";
 
 const formatNumber = (n: number) =>
   n.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -72,7 +72,7 @@ const Index = () => {
   const [blockHeightInput, setBlockHeightInput] = useState("");
   const [stats, setStats] = useState<NetworkStats | null>(null);
   const [recentBlocks, setRecentBlocks] = useState<ChainBlock[]>([]);
-  const [pendingTxs, setPendingTxs] = useState<Transaction[]>([]);
+  const [privateActivity, setPrivateActivity] = useState<PrivateActivityItem[]>([]);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
@@ -97,14 +97,14 @@ const Index = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [sample, blocks, pending] = await Promise.all([
+        const [sample, blocks, activity] = await Promise.all([
           getNetworkStats(),
           getRecentBlocks(5),
-          getRecentTransactions(5).catch(() => [] as Transaction[]),
+          getRecentPrivateActivity(6).catch(() => [] as PrivateActivityItem[]),
         ]);
         setStats(sample);
         setRecentBlocks(blocks);
-        setPendingTxs(pending);
+        setPrivateActivity(activity);
         const h = historyRef.current;
         const push = (key: keyof typeof h, value: number) => {
           h[key] = [...h[key].slice(-HISTORY_LEN + 1), value];
@@ -399,29 +399,27 @@ const Index = () => {
         </div>
       </section>
 
-      {pendingTxs.length > 0 && (
+      {privateActivity.length > 0 && (
         <section className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-6">
           <div className="flex items-center justify-between border-b border-border pb-2">
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-              <Clock3 className="h-3 w-3 text-yellow-500/70" />
-              Mempool · Pending
+              <Lock className="h-3 w-3 text-signal" />
+              Recent private activity
             </div>
             <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-              {pendingTxs.length} unconfirmed
+              hash + block only
             </div>
           </div>
           <div className="divide-y divide-border">
-            {pendingTxs.map((tx) => (
+            {privateActivity.map((item) => (
               <Link
-                key={tx.hash}
-                to={`/tx/${encodeURIComponent(tx.hash)}`}
-                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-3 text-sm transition-colors hover:bg-accent/20"
+                key={item.hash}
+                to={`/record/private-tx/${encodeURIComponent(item.hash)}`}
+                className="grid grid-cols-[64px_1fr_auto] items-center gap-3 py-3 text-sm transition-colors hover:bg-accent/20"
               >
-                <span className="inline-flex h-5 items-center rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 text-[10px] uppercase tracking-[0.14em] text-yellow-500/80">
-                  pending
-                </span>
+                <span className="font-mono-tight text-signal">#{item.blockHeight.toLocaleString()}</span>
                 <span className="font-mono-tight truncate text-muted-foreground">
-                  {tx.hash}
+                  {item.hash}
                 </span>
                 <span className="text-xs text-muted-foreground">view</span>
               </Link>
@@ -452,9 +450,15 @@ const Index = () => {
               <span className="font-mono-tight truncate text-muted-foreground">
                 {block.hash}
               </span>
-              <span className="text-xs text-muted-foreground">
-                view
-              </span>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {(block.privateTxCount ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 text-signal/80" title="private transactions">
+                    <Lock className="h-3 w-3" />
+                    {block.privateTxCount}
+                  </span>
+                )}
+                <span>{formatAge(block.timestamp)}</span>
+              </div>
             </Link>
           ))}
           {recentBlocks.length === 0 && (
