@@ -5,7 +5,7 @@
       "destination": "http://159.223.119.216:3000/:path*"
     },
     {
-      "source": "/((?!rpc/).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
