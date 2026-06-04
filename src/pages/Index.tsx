@@ -20,11 +20,12 @@ import { getActiveNetwork, getNetworkConfig, onNetworkChange } from "@/lib/confi
 import {
   getNetworkStats,
   getRecentBlocks,
+  getRecentTransactions,
   getSuggestions,
   search,
   type SearchSuggestion,
 } from "@/lib/api";
-import type { Block as ChainBlock, NetworkStats } from "@/lib/types";
+import type { Block as ChainBlock, NetworkStats, Transaction } from "@/lib/types";
 
 const formatNumber = (n: number) =>
   n.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -71,6 +72,7 @@ const Index = () => {
   const [blockHeightInput, setBlockHeightInput] = useState("");
   const [stats, setStats] = useState<NetworkStats | null>(null);
   const [recentBlocks, setRecentBlocks] = useState<ChainBlock[]>([]);
+  const [pendingTxs, setPendingTxs] = useState<Transaction[]>([]);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
@@ -95,12 +97,14 @@ const Index = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [sample, blocks] = await Promise.all([
+        const [sample, blocks, pending] = await Promise.all([
           getNetworkStats(),
           getRecentBlocks(5),
+          getRecentTransactions(5).catch(() => [] as Transaction[]),
         ]);
         setStats(sample);
         setRecentBlocks(blocks);
+        setPendingTxs(pending);
         const h = historyRef.current;
         const push = (key: keyof typeof h, value: number) => {
           h[key] = [...h[key].slice(-HISTORY_LEN + 1), value];
@@ -394,6 +398,37 @@ const Index = () => {
           ))}
         </div>
       </section>
+
+      {pendingTxs.length > 0 && (
+        <section className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-6">
+          <div className="flex items-center justify-between border-b border-border pb-2">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+              <Clock3 className="h-3 w-3 text-yellow-500/70" />
+              Mempool · Pending
+            </div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+              {pendingTxs.length} unconfirmed
+            </div>
+          </div>
+          <div className="divide-y divide-border">
+            {pendingTxs.map((tx) => (
+              <Link
+                key={tx.hash}
+                to={`/tx/${encodeURIComponent(tx.hash)}`}
+                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-3 text-sm transition-colors hover:bg-accent/20"
+              >
+                <span className="inline-flex h-5 items-center rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 text-[10px] uppercase tracking-[0.14em] text-yellow-500/80">
+                  pending
+                </span>
+                <span className="font-mono-tight truncate text-muted-foreground">
+                  {tx.hash}
+                </span>
+                <span className="text-xs text-muted-foreground">view</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-10">
         <div className="flex items-center justify-between border-b border-border pb-2">

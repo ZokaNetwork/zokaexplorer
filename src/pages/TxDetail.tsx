@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Copy, ShieldCheck, Lock } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, Clock3, Copy, ShieldCheck, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import SiteHeader from "@/components/SiteHeader";
@@ -42,25 +42,26 @@ const Field = ({
 
 const TxDetail = () => {
   const { hash = "" } = useParams();
-  const navigate = useNavigate();
   const [tx, setTx] = useState<Transaction | null>(null);
+  const [notIndexed, setNotIndexed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
+    setNotIndexed(false);
     getTransaction(hash)
       .then((t) => {
         if (!t) {
-          navigate("/not-found", { replace: true });
+          setNotIndexed(true);
           return;
         }
         setTx(t);
       })
       .catch((e) => setError(e.message || "Failed to load transaction"))
       .finally(() => setLoading(false));
-  }, [hash, navigate]);
+  }, [hash]);
 
   return (
     <main className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
@@ -77,17 +78,62 @@ const TxDetail = () => {
             <p className="text-sm text-destructive">{error}</p>
             <Button variant="outline" size="sm" className="mt-4" onClick={() => window.location.reload()}>Retry</Button>
           </div>
-        ) : loading || !tx ? (
+        ) : loading ? (
           <div className="mt-12 text-center text-muted-foreground text-sm">Loading transaction…</div>
-        ) : (
+        ) : notIndexed ? (
+          <div className="mt-6 rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-yellow-500/80">
+                  <Clock3 className="h-3 w-3" />
+                  Broadcast · Awaiting Confirmation
+                </div>
+                <h1 className="mt-3 text-sm font-medium text-muted-foreground">Private Transaction</h1>
+                <p className="font-mono-tight mt-1 break-all text-base text-foreground sm:text-lg">{hash}</p>
+              </div>
+              <Button variant="outline" size="sm" className="h-9 rounded-lg border-border bg-background text-xs shrink-0" onClick={() => { navigator.clipboard.writeText(hash); toast({ title: "Hash copied" }); }}>
+                <Copy className="mr-1.5 h-3.5 w-3.5" /> Copy
+              </Button>
+            </div>
+            <div className="mt-5 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3">
+              {[
+                { label: "Block", value: "Pending" },
+                { label: "Confirmations", value: "0" },
+                { label: "Type", value: "Private · Shielded" },
+              ].map((m) => (
+                <div key={m.label} className="bg-card px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{m.label}</div>
+                  <div className="font-mono-tight mt-1.5 text-sm text-foreground">{m.value}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 space-y-2 rounded-lg border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
+              <div className="flex items-start gap-2">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-signal" />
+                <span>This transaction was broadcast to the network. Sender, receiver and amount are cryptographically hidden.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500/70" />
+                <span>It is not yet included in a mined block. Once a miner confirms it, this page will show full zk-SNARK proof details. Refresh after the next block.</span>
+              </div>
+            </div>
+          </div>
+        ) : tx ? (
           <>
             <div className="mt-6 rounded-xl border border-border bg-card p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                    <ShieldCheck className="h-3 w-3 text-signal" />
-                    {tx.status === "confirmed" ? "Confirmed · zk-SNARK verified" : tx.status}
-                  </div>
+                  {tx.status === "pending" ? (
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-yellow-500/80">
+                      <Clock3 className="h-3 w-3" />
+                      In Mempool · Awaiting Confirmation
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      <ShieldCheck className="h-3 w-3 text-signal" />
+                      {tx.status === "confirmed" ? "Confirmed · zk-SNARK verified" : tx.status}
+                    </div>
+                  )}
                   <h1 className="mt-3 text-sm font-medium text-muted-foreground">Transaction</h1>
                   <p className="font-mono-tight mt-1 break-all text-base text-foreground sm:text-lg">{hash}</p>
                 </div>
@@ -113,7 +159,11 @@ const TxDetail = () => {
             <div className="mt-6 grid gap-6 lg:grid-cols-3">
               <div className="rounded-xl border border-border bg-card lg:col-span-2">
                 <div className="border-b border-border px-5 py-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Details</div>
-                <Field label="Status" value={<span className="text-signal capitalize">{tx.status}</span>} />
+                <Field label="Status" value={
+                  tx.status === "pending"
+                    ? <span className="text-yellow-500/80 capitalize">Pending — in mempool, not yet mined</span>
+                    : <span className="text-signal capitalize">{tx.status}</span>
+                } />
                 <Field label="Timestamp" value={tx.timestamp ? new Date(tx.timestamp).toUTCString() : "—"} />
                 {tx.blockHeight > 0 && (
                   <Field label="Block Height" value={tx.blockHeight.toLocaleString()} mono link={`/block/${tx.blockHeight}`} />
@@ -137,7 +187,7 @@ const TxDetail = () => {
               </div>
             </div>
           </>
-        )}
+        ) : null}
       </section>
 
       <SiteFooter />

@@ -426,9 +426,33 @@ export async function getTransaction(hash: string): Promise<Transaction | null> 
       proof: "",
     };
   } catch (e) {
-    if (e instanceof ApiError && e.status === 404) return null;
-    throw e;
+    if (!(e instanceof ApiError) || e.status !== 404) throw e;
   }
+
+  // Fallback: scan mempool for pending TXs not yet confirmed
+  try {
+    const mempool = await apiFetch<{ count?: number; pending?: NodeTransaction[] }>("/mempool/pending");
+    const found = (mempool.pending ?? []).find((tx) => tx.hash === hash);
+    if (found) {
+      return {
+        hash: found.hash,
+        blockHeight: 0,
+        blockHash: "",
+        timestamp: found.timestamp ? found.timestamp * 1000 : Date.now(),
+        status: "pending",
+        amount: 0,
+        fee: 0,
+        from: "shielded",
+        to: "shielded",
+        ringSize: 0,
+        size: 0,
+        confirmations: 0,
+        proof: "",
+      };
+    }
+  } catch { /* mempool check is best-effort */ }
+
+  return null;
 }
 
 export async function getSafeRecord(kind: SafeRecordKind, id: string): Promise<SafeRecord> {
