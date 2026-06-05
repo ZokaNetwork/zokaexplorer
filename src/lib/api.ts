@@ -685,6 +685,8 @@ const isZokaAddress = (s: string) =>
 
 const isHexLike = (s: string) => /^(0x)?[a-f0-9]{16,128}$/i.test(s);
 const isLongHash = (s: string) => /^(0x)?[a-f0-9]{32,128}$/i.test(s);
+export const isScanKeyLikeQuery = (s: string) =>
+  /^(0x)?[a-f0-9]{64}$/i.test(s.trim());
 
 function parseRecordQuery(q: string): SearchResult | null {
   const prefixed = q.match(/^(commitment|nullifier|root|private-tx|tx):(.+)$/i);
@@ -734,7 +736,12 @@ export async function search(query: string): Promise<SearchResult | null> {
   const classified = classifyQuery(q);
   if (!classified) return null;
 
-  if (!config.useMock && classified.type === "record" && classified.kind === "hash") {
+  const requiresVerifiedHashLookup =
+    classified.type === "record" && classified.kind === "hash" && isLongHash(q);
+
+  if (requiresVerifiedHashLookup) {
+    if (config.useMock) return null;
+
     const clean = q.startsWith("0x") ? q.slice(2) : q;
     try {
       const block = await getBlock(clean);

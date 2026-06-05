@@ -23,6 +23,7 @@ import {
   getRecentBlocks,
   getRecentPrivateActivity,
   getSuggestions,
+  isScanKeyLikeQuery,
   search,
   type SearchSuggestion,
 } from "@/lib/api";
@@ -186,6 +187,14 @@ const Index = () => {
     try {
       const result = await search(q);
       if (!result) {
+        if (isScanKeyLikeQuery(q)) {
+          toast({
+            title: "Scan private key detected",
+            description: "A scan key cannot be searched alone. Open the zpriv address page and paste it in Scan private key.",
+            variant: "destructive",
+          });
+          return;
+        }
         toast({
           title: "Not found",
           description: "No safe public record matched that query.",
