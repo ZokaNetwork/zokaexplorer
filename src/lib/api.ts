@@ -693,7 +693,7 @@ function parseRecordQuery(q: string): SearchResult | null {
     const kind: SafeRecordKind = rawKind === "tx" ? "private-tx" : (rawKind as SafeRecordKind);
     const id = prefixed[2].trim();
     return {
-      type: kind === "private-tx" ? "transaction" : "record",
+      type: "record",
       kind,
       id,
       label: `${kind} ${id.slice(0, 16)}...`,
@@ -755,6 +755,7 @@ export async function search(query: string): Promise<SearchResult | null> {
         };
       }
     } catch { /* safe fallback */ }
+    return null;
   }
 
   return classified;
@@ -809,14 +810,7 @@ export async function getSuggestions(query: string): Promise<SearchSuggestion[]>
         detail: parsed.kind === "private-tx" ? "Private tx hash" : "Private-safe record",
       });
     }
-  } else if (isLongHash(q)) {
-    suggestions.push({
-      type: "record",
-      kind: "hash",
-      id: q,
-      label: `Hash ${q.slice(0, 16)}...`,
-      detail: "Block, tx, commitment, nullifier, or root",
-    });
+
   } else if (/^0x/i.test(q)) {
     suggestions.push({ type: "block", id: q, label: `Block ${q.slice(0, 16)}…`, detail: "Block hash" });
   }

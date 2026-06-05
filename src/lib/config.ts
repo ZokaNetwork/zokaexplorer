@@ -51,8 +51,12 @@ const NETWORKS: Record<NetworkId, NetworkConfig> = {
   },
 };
 
+const storage = typeof localStorage !== "undefined" && localStorage.getItem
+  ? localStorage
+  : null;
+
 let _activeNetwork: NetworkId =
-  (localStorage.getItem("zoka_network") as NetworkId | null) || "mainnet";
+  (storage?.getItem("zoka_network") as NetworkId | null) || "mainnet";
 let configLoadStarted: Promise<void> | null = null;
 
 const listeners = new Set<() => void>();
@@ -63,7 +67,7 @@ export function getActiveNetwork(): NetworkId {
 
 export function setActiveNetwork(id: NetworkId) {
   _activeNetwork = NETWORKS[id] ? id : "mainnet";
-  localStorage.setItem("zoka_network", _activeNetwork);
+  storage?.setItem("zoka_network", _activeNetwork);
   listeners.forEach((fn) => fn());
 }
 
@@ -107,7 +111,7 @@ async function loadRuntimeNetworkConfig(): Promise<void> {
     }
     if (runtime.active_network && NETWORKS[runtime.active_network]) {
       _activeNetwork = runtime.active_network;
-      localStorage.setItem("zoka_network", _activeNetwork);
+      storage?.setItem("zoka_network", _activeNetwork);
     }
     listeners.forEach((fn) => fn());
   } catch {
