@@ -91,6 +91,7 @@ const Index = () => {
   });
   const suggestionsRef = useRef<HTMLFormElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const statsInFlightRef = useRef(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -100,12 +101,16 @@ const Index = () => {
 
   useEffect(() => {
     const fetchStats = async () => {
+      if (statsInFlightRef.current) return;
+      statsInFlightRef.current = true;
       try {
-        const [sample, blocks, activity, mem] = await Promise.all([
+        const [sample, mem] = await Promise.all([
           getNetworkStats(),
-          getRecentBlocks(5),
-          getRecentPrivateActivity(6).catch(() => [] as PrivateActivityItem[]),
           getMempoolInfo().catch(() => ({ publicPending: 0, privatePending: 0 })),
+        ]);
+        const [blocks, activity] = await Promise.all([
+          getRecentBlocks(5, sample.height),
+          getRecentPrivateActivity(6, sample.height).catch(() => [] as PrivateActivityItem[]),
         ]);
         setStats(sample);
         setRecentBlocks(blocks);
@@ -123,10 +128,12 @@ const Index = () => {
         push("miners", sample.minersOnline ?? 0);
       } catch {
         // Keep the last good sample.
+      } finally {
+        statsInFlightRef.current = false;
       }
     };
     fetchStats();
-    const id = setInterval(fetchStats, 8000);
+    const id = setInterval(fetchStats, 20000);
     return () => clearInterval(id);
   }, [network]);
 

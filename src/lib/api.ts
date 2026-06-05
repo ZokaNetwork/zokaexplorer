@@ -35,7 +35,7 @@ async function fetchWithTimeout(url: string, timeoutMs = config.TIMEOUT_MS): Pro
   try {
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) {
-      const retryable = res.status >= 500 || res.status === 429;
+      const retryable = res.status >= 500;
       throw new ApiError(`HTTP ${res.status}`, res.status, retryable);
     }
     return res;
@@ -48,9 +48,25 @@ async function fetchWithTimeout(url: string, timeoutMs = config.TIMEOUT_MS): Pro
   }
 }
 
+const readCache = new Map<string, { expiresAt: number; promise: Promise<unknown> }>();
+const READ_CACHE_TTL_MS = 2000;
+
 async function apiFetch<T>(path: string): Promise<T> {
   await ensureNetworkConfigLoaded();
   const url = `${config.RPC_URL}${path}`;
+  const now = Date.now();
+  const cached = readCache.get(url);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise as Promise<T>;
+  }
+
+  const promise = fetchJsonWithRetries<T>(url);
+  readCache.set(url, { expiresAt: now + READ_CACHE_TTL_MS, promise });
+  promise.catch(() => readCache.delete(url));
+  return promise;
+}
+
+async function fetchJsonWithRetries<T>(url: string): Promise<T> {
   let lastError: ApiError | null = null;
   for (let attempt = 0; attempt <= config.MAX_RETRIES; attempt++) {
     try {
@@ -82,7 +98,7 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
       throw new ApiError(
         message || `HTTP ${res.status}`,
         res.status,
-        res.status >= 500 || res.status === 429,
+        res.status >= 500,
       );
     }
     return (await res.json()) as T;
@@ -239,12 +255,6 @@ export async function getNetworkStats(): Promise<NetworkStats> {
     reported_hashrate_hps?: number;
   }>("/stats");
 
-  let mempoolSize = 0;
-  try {
-    const mempool = await apiFetch<{ size?: number; pending_transactions?: number }>("/mempool/size");
-    mempoolSize = mempool.size ?? mempool.pending_transactions ?? 0;
-  } catch { /* optional */ }
-
   return {
     height: raw.height ?? 0,
     difficulty: raw.difficulty ?? raw.difficulty_bits ?? 0,
@@ -252,7 +262,7 @@ export async function getNetworkStats(): Promise<NetworkStats> {
     emission: raw.emission_zka ?? 0,
     lastBlockTime: raw.last_block_time ? raw.last_block_time * 1000 : 0,
     networkVersion: raw.network_version ?? "0.1.0",
-    mempoolSize,
+    mempoolSize: 0,
     minersOnline: raw.miners_online ?? 0,
     connectedPeers: raw.connected_peers ?? 0,
     reportedHashrate: raw.reported_hashrate_hps ?? 0,
@@ -375,7 +385,7 @@ export async function getBlock(heightOrHash: string | number): Promise<Block | n
   }
 }
 
-export async function getRecentBlocks(count = 10): Promise<Block[]> {
+export async function getRecentBlocks(count = 10, knownHeight?: number): Promise<Block[]> {
   await ensureNetworkConfigLoaded();
   if (config.useMock) {
     await delay();
@@ -385,7 +395,7 @@ export async function getRecentBlocks(count = 10): Promise<Block[]> {
     return blocks.filter(Boolean) as Block[];
   }
 
-  const { height } = await apiFetch<{ height: number }>("/chain/height");
+  const height = knownHeight ?? (await apiFetch<{ height: number }>("/chain/height")).height;
   if (height === 0) return [];
 
   const from = Math.max(0, height - count + 1);
@@ -428,10 +438,13 @@ export async function getRecentBlocks(count = 10): Promise<Block[]> {
 // Recent private-tx activity: hashes anchored in recent blocks, newest first.
 // Privacy-safe — exposes only the hash and the block it landed in, never
 // amounts, parties or owners.
-export async function getRecentPrivateActivity(count = 8): Promise<PrivateActivityItem[]> {
+export async function getRecentPrivateActivity(
+  count = 8,
+  knownHeight?: number,
+): Promise<PrivateActivityItem[]> {
   await ensureNetworkConfigLoaded();
   if (config.useMock) return [];
-  const { height } = await apiFetch<{ height: number }>("/chain/height");
+  const height = knownHeight ?? (await apiFetch<{ height: number }>("/chain/height")).height;
   if (height === 0) return [];
   const lookback = 64;
   const from = Math.max(0, height - lookback + 1);
