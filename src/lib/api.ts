@@ -872,16 +872,10 @@ export async function getSuggestions(query: string): Promise<SearchSuggestion[]>
       label: `Scan key ${clean.slice(0, 16)}...`,
       detail: "Personal private history",
     });
-    const verifiedHash = await resolveVerifiedHashQuery(q);
-    if (verifiedHash) {
-      suggestions.push({
-        type: verifiedHash.type,
-        kind: verifiedHash.kind,
-        id: verifiedHash.id,
-        label: verifiedHash.label,
-        detail: verifiedHash.type === "record" ? "Private tx hash" : "Verified hash",
-      });
-    }
+    // Note: a 64-hex string is also block-hash/tx-hash shaped, but we do NOT
+    // probe /blocks/hash or /transactions here — those 404 for a real scan key
+    // and only spam the console. The submit path (search()) still resolves a
+    // genuine hash via resolveVerifiedHashQuery before falling back to scan-key.
   } else if (/^0x/i.test(q)) {
     suggestions.push({ type: "block", id: q, label: `Block ${q.slice(0, 16)}…`, detail: "Block hash" });
   }
