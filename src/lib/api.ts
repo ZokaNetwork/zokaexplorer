@@ -670,6 +670,14 @@ export async function getAddress(addr: string): Promise<Address | null> {
   }
 }
 
+// Shown when a scan is attempted: the privacy-safe in-browser scan is being
+// built; we never send a view/scan key to a server.
+export const SCAN_DISABLED_NOTICE =
+  "El escaneo por scan key ahora se hace solo del lado del cliente (la key nunca " +
+  "sale de tu navegador) y está en construcción. Por privacidad ya no se envía la " +
+  "view key al servidor. Mientras tanto, mirá tu balance y recompensas en tu wallet " +
+  "(ZSilent / ZKAPriv).";
+
 // zka1… addresses are ~100 chars; tx hashes start with zka but not zka1
 export async function scanPrivateAddress(
   address: string,
@@ -686,11 +694,12 @@ export async function scanPrivateAddress(
       matches: [],
     };
   }
-  return apiPost<PrivateViewScan>("/private/view-scan", {
-    address,
-    scan_key_hex: scanKeyHex,
-    limit: 100,
-  });
+  // Privacy: never send a view/scan key to the server. The server-side scan is
+  // disabled; the client-side (in-browser) scan is being built. Until then,
+  // see your balance in your wallet (ZSilent / ZKAPriv).
+  void address;
+  void scanKeyHex;
+  throw new Error(SCAN_DISABLED_NOTICE);
 }
 
 export async function scanPrivateKey(scanKeyHex: string): Promise<PrivateViewScan> {
@@ -706,10 +715,9 @@ export async function scanPrivateKey(scanKeyHex: string): Promise<PrivateViewSca
       matches: [],
     };
   }
-  return apiPost<PrivateViewScan>("/private/view-scan-key", {
-    scan_key_hex: cleanKey,
-    limit: 100,
-  });
+  // Privacy: never send the scan key to the server (see scanPrivateAddress).
+  void cleanKey;
+  throw new Error(SCAN_DISABLED_NOTICE);
 }
 
 const isZokaAddress = (s: string) =>
