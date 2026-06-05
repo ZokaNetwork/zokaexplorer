@@ -90,7 +90,7 @@ export interface PrivateViewScan {
 }
 
 export interface SearchResult {
-  type: "transaction" | "block" | "address" | "record";
+  type: "transaction" | "block" | "address" | "record" | "scan-key";
   id: string;              // hash, height, or address
   label: string;           // short display text
   kind?: SafeRecordKind;

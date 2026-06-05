@@ -16,22 +16,30 @@ describe("explorer search routing", () => {
     expect(isScanKeyLikeQuery(scanKeyHex.slice(0, 32))).toBe(false);
   });
 
-  it("does not offer a bare scan key as a clickable hash suggestion", async () => {
+  it("offers a bare scan key as a clickable scan-key suggestion", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("{}", { status: 404 })),
     );
 
-    await expect(getSuggestions(scanKeyHex)).resolves.toEqual([]);
+    await expect(getSuggestions(scanKeyHex)).resolves.toEqual([
+      expect.objectContaining({
+        type: "scan-key",
+        id: scanKeyHex,
+      }),
+    ]);
   });
 
-  it("does not route an unknown bare scan key to record/hash", async () => {
+  it("routes an unknown bare scan key to scan-key history, not record/hash", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("{}", { status: 404 })),
     );
 
-    await expect(search(scanKeyHex)).resolves.toBeNull();
+    await expect(search(scanKeyHex)).resolves.toMatchObject({
+      type: "scan-key",
+      id: scanKeyHex,
+    });
   });
 
   it("routes tx-prefixed private hashes to the private record view", async () => {

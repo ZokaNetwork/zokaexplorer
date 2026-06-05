@@ -680,6 +680,25 @@ export async function scanPrivateAddress(
   });
 }
 
+export async function scanPrivateKey(scanKeyHex: string): Promise<PrivateViewScan> {
+  await ensureNetworkConfigLoaded();
+  const cleanKey = scanKeyHex.trim().replace(/^0x/i, "");
+  if (config.useMock) {
+    await delay();
+    return {
+      address: "zpriv:mock",
+      scanned_transactions: 0,
+      matching_outputs: 0,
+      total_amount_atoms: 0,
+      matches: [],
+    };
+  }
+  return apiPost<PrivateViewScan>("/private/view-scan-key", {
+    scan_key_hex: cleanKey,
+    limit: 100,
+  });
+}
+
 const isZokaAddress = (s: string) =>
   (/^zka1/i.test(s) && s.length >= 60) || /^zpriv:/i.test(s);
 
@@ -687,6 +706,7 @@ const isHexLike = (s: string) => /^(0x)?[a-f0-9]{16,128}$/i.test(s);
 const isLongHash = (s: string) => /^(0x)?[a-f0-9]{32,128}$/i.test(s);
 export const isScanKeyLikeQuery = (s: string) =>
   /^(0x)?[a-f0-9]{64}$/i.test(s.trim());
+const cleanHexPrefix = (s: string) => s.trim().replace(/^0x/i, "");
 
 function parseRecordQuery(q: string): SearchResult | null {
   const prefixed = q.match(/^(commitment|nullifier|root|private-tx|tx):(.+)$/i);
@@ -730,6 +750,31 @@ const classifyQuery = (q: string): SearchResult | null => {
 
 // ── Search ──────────────────────────────────────────────────────
 
+async function resolveVerifiedHashQuery(q: string): Promise<SearchResult | null> {
+  if (config.useMock) return null;
+  const clean = cleanHexPrefix(q);
+  try {
+    const block = await getBlock(clean);
+    if (block) return { type: "block", id: clean, label: `Block ${clean.slice(0, 16)}...` };
+  } catch { /* try tx next */ }
+  try {
+    const tx = await getTransaction(clean);
+    if (tx) return { type: "transaction", id: clean, label: `Tx ${clean.slice(0, 16)}...` };
+  } catch { /* safe fallback */ }
+  try {
+    const privateTx = await findPrivateTxInRecentBlocks(clean);
+    if (privateTx) {
+      return {
+        type: "record",
+        kind: "private-tx",
+        id: clean,
+        label: `Private tx ${clean.slice(0, 16)}...`,
+      };
+    }
+  } catch { /* safe fallback */ }
+  return null;
+}
+
 export async function search(query: string): Promise<SearchResult | null> {
   await ensureNetworkConfigLoaded();
   const q = query.trim();
@@ -740,28 +785,16 @@ export async function search(query: string): Promise<SearchResult | null> {
     classified.type === "record" && classified.kind === "hash" && isLongHash(q);
 
   if (requiresVerifiedHashLookup) {
-    if (config.useMock) return null;
-
-    const clean = q.startsWith("0x") ? q.slice(2) : q;
-    try {
-      const block = await getBlock(clean);
-      if (block) return { type: "block", id: clean, label: `Block ${clean.slice(0, 16)}...` };
-    } catch { /* try tx next */ }
-    try {
-      const tx = await getTransaction(clean);
-      if (tx) return { type: "transaction", id: clean, label: `Tx ${clean.slice(0, 16)}...` };
-    } catch { /* safe fallback */ }
-    try {
-      const privateTx = await findPrivateTxInRecentBlocks(clean);
-      if (privateTx) {
-        return {
-          type: "record",
-          kind: "private-tx",
-          id: clean,
-          label: `Private tx ${clean.slice(0, 16)}...`,
-        };
-      }
-    } catch { /* safe fallback */ }
+    const verifiedHash = await resolveVerifiedHashQuery(q);
+    if (verifiedHash) return verifiedHash;
+    if (isScanKeyLikeQuery(q)) {
+      const clean = cleanHexPrefix(q);
+      return {
+        type: "scan-key",
+        id: clean,
+        label: `Scan key ${clean.slice(0, 16)}...`,
+      };
+    }
     return null;
   }
 
@@ -771,7 +804,7 @@ export async function search(query: string): Promise<SearchResult | null> {
 // ── Search suggestions (for autocomplete) ───────────────────────
 
 export interface SearchSuggestion {
-  type: "transaction" | "block" | "address" | "record";
+  type: "transaction" | "block" | "address" | "record" | "scan-key";
   id: string;
   label: string;
   detail?: string;
@@ -818,6 +851,24 @@ export async function getSuggestions(query: string): Promise<SearchSuggestion[]>
       });
     }
 
+  } else if (isScanKeyLikeQuery(q)) {
+    const clean = cleanHexPrefix(q);
+    suggestions.push({
+      type: "scan-key",
+      id: clean,
+      label: `Scan key ${clean.slice(0, 16)}...`,
+      detail: "Personal private history",
+    });
+    const verifiedHash = await resolveVerifiedHashQuery(q);
+    if (verifiedHash) {
+      suggestions.push({
+        type: verifiedHash.type,
+        kind: verifiedHash.kind,
+        id: verifiedHash.id,
+        label: verifiedHash.label,
+        detail: verifiedHash.type === "record" ? "Private tx hash" : "Verified hash",
+      });
+    }
   } else if (/^0x/i.test(q)) {
     suggestions.push({ type: "block", id: q, label: `Block ${q.slice(0, 16)}…`, detail: "Block hash" });
   }

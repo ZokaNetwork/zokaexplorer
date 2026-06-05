@@ -6,6 +6,7 @@ import {
   CircleDot,
   Clock3,
   Hash,
+  KeyRound,
   Lock,
   Search,
   ShieldCheck,
@@ -23,7 +24,6 @@ import {
   getRecentBlocks,
   getRecentPrivateActivity,
   getSuggestions,
-  isScanKeyLikeQuery,
   search,
   type SearchSuggestion,
 } from "@/lib/api";
@@ -67,6 +67,7 @@ const TYPE_ICONS: Record<string, typeof Box> = {
   transaction: Hash,
   address: Wallet,
   record: CircleDot,
+  "scan-key": KeyRound,
 };
 
 const Index = () => {
@@ -164,6 +165,12 @@ const Index = () => {
     kind?: SearchSuggestion["kind"];
   }) => {
     setShowSuggestions(false);
+    if (result.type === "scan-key") {
+      const cleanKey = result.id.trim().replace(/^0x/i, "");
+      sessionStorage.setItem("zoka_scan_key_for_history", cleanKey);
+      navigate("/view-scan", { state: { scanKey: cleanKey } });
+      return;
+    }
     if (result.type === "transaction") navigate(`/tx/${encodeURIComponent(result.id)}`);
     if (result.type === "block") navigate(`/block/${encodeURIComponent(result.id)}`);
     if (result.type === "address") navigate(`/address/${encodeURIComponent(result.id)}`);
@@ -187,14 +194,6 @@ const Index = () => {
     try {
       const result = await search(q);
       if (!result) {
-        if (isScanKeyLikeQuery(q)) {
-          toast({
-            title: "Scan private key detected",
-            description: "A scan key cannot be searched alone. Open the zpriv address page and paste it in Scan private key.",
-            variant: "destructive",
-          });
-          return;
-        }
         toast({
           title: "Not found",
           description: "No safe public record matched that query.",

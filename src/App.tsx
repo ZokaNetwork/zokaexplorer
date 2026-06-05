@@ -8,6 +8,7 @@ import TxDetail from "./pages/TxDetail.tsx";
 import BlockDetail from "./pages/BlockDetail.tsx";
 import AddressDetail from "./pages/AddressDetail.tsx";
 import RecordDetail from "./pages/RecordDetail.tsx";
+import ViewScanDetail from "./pages/ViewScanDetail.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/tx/:hash" element={<TxDetail />} />
           <Route path="/block/:heightOrHash" element={<BlockDetail />} />
           <Route path="/address/:address" element={<AddressDetail />} />
+          <Route path="/view-scan" element={<ViewScanDetail />} />
           <Route path="/record/:kind/:id" element={<RecordDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
