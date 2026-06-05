@@ -68,6 +68,27 @@ export interface Address {
   transactions: string[];  // tx hashes (most recent)
 }
 
+export interface PrivateViewOutput {
+  tx_hash: string;
+  output_id: string;
+  output_index: number;
+  asset_tag: string;
+  amount: number;
+  commitment: string;
+  stealth_address: string;
+  one_time_public_key: string;
+  is_change: boolean;
+  timestamp: number;
+}
+
+export interface PrivateViewScan {
+  address: string;
+  scanned_transactions: number;
+  matching_outputs: number;
+  total_amount_atoms: number;
+  matches: PrivateViewOutput[];
+}
+
 export interface SearchResult {
   type: "transaction" | "block" | "address" | "record";
   id: string;              // hash, height, or address

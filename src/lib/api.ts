@@ -13,6 +13,7 @@ import type {
   SafeRecord,
   SafeRecordKind,
   PrivateActivityItem,
+  PrivateViewScan,
 } from "./types";
 
 // ── Network layer with retries ──────────────────────────────────
@@ -62,6 +63,36 @@ async function apiFetch<T>(path: string): Promise<T> {
     }
   }
   throw lastError!;
+}
+
+async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  await ensureNetworkConfigLoaded();
+  const url = `${config.RPC_URL}${path}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const message = await res.text().catch(() => `HTTP ${res.status}`);
+      throw new ApiError(
+        message || `HTTP ${res.status}`,
+        res.status,
+        res.status >= 500 || res.status === 429,
+      );
+    }
+    return (await res.json()) as T;
+  } catch (err: any) {
+    if (err.name === "AbortError") throw new ApiError("Request timeout", undefined, true);
+    if (err instanceof ApiError) throw err;
+    throw new ApiError(err.message ?? "Network error", undefined, true);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ── Mock helpers ────────────────────────────────────────────────
@@ -627,8 +658,30 @@ export async function getAddress(addr: string): Promise<Address | null> {
 }
 
 // zka1… addresses are ~100 chars; tx hashes start with zka but not zka1
+export async function scanPrivateAddress(
+  address: string,
+  scanKeyHex: string,
+): Promise<PrivateViewScan> {
+  await ensureNetworkConfigLoaded();
+  if (config.useMock) {
+    await delay();
+    return {
+      address,
+      scanned_transactions: 0,
+      matching_outputs: 0,
+      total_amount_atoms: 0,
+      matches: [],
+    };
+  }
+  return apiPost<PrivateViewScan>("/private/view-scan", {
+    address,
+    scan_key_hex: scanKeyHex,
+    limit: 100,
+  });
+}
+
 const isZokaAddress = (s: string) =>
-  /^zka1/i.test(s) && s.length >= 60;
+  (/^zka1/i.test(s) && s.length >= 60) || /^zpriv:/i.test(s);
 
 const isHexLike = (s: string) => /^(0x)?[a-f0-9]{16,128}$/i.test(s);
 const isLongHash = (s: string) => /^(0x)?[a-f0-9]{32,128}$/i.test(s);
