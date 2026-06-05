@@ -4,6 +4,8 @@
 // When RPC_URL is empty → returns mock data for UI development.
 
 import { config, ensureNetworkConfigLoaded } from "./config";
+import initScanWasm, { derive_payment_address } from "./scan-wasm/zoka_scan_wasm.js";
+import scanWasmUrl from "./scan-wasm/zoka_scan_wasm_bg.wasm?url";
 import type {
   NetworkStats,
   Block,
@@ -718,6 +720,70 @@ export async function scanPrivateKey(scanKeyHex: string): Promise<PrivateViewSca
   // Privacy: never send the scan key to the server (see scanPrivateAddress).
   void cleanKey;
   throw new Error(SCAN_DISABLED_NOTICE);
+}
+
+// ── Client-side mining-reward scan (privacy: key never leaves browser) ──
+// Derives the wallet's zpriv: address from the scan key IN WASM (in-browser),
+// then matches it against the public per-block coinbase recipient_commitments
+// from /private/coinbases/range. The scan key is never sent anywhere.
+
+let scanWasmReady: Promise<unknown> | null = null;
+function ensureScanWasm() {
+  if (!scanWasmReady) scanWasmReady = initScanWasm(scanWasmUrl);
+  return scanWasmReady;
+}
+
+export interface RewardMatch {
+  height: number;
+  amount_atoms: number;
+  unlock_height: number;
+}
+
+export interface RewardScan {
+  address: string;
+  total_amount_atoms: number;
+  matches: RewardMatch[];
+  blocks_scanned: number;
+}
+
+interface CoinbaseRec {
+  height: number;
+  recipient_commitment: string;
+  amount_atoms: number;
+  unlock_height: number;
+}
+
+export async function scanMiningRewardsClientSide(scanKeyHex: string): Promise<RewardScan> {
+  await ensureNetworkConfigLoaded();
+  await ensureScanWasm();
+  let address: string;
+  try {
+    address = derive_payment_address(scanKeyHex.trim().replace(/^0x/i, ""));
+  } catch {
+    throw new Error("Scan key inválida: debe ser hex de 16 o 32 bytes.");
+  }
+  const { height } = await apiFetch<{ height: number }>("/chain/height");
+  const matches: RewardMatch[] = [];
+  let total = 0;
+  const CHUNK = 1000;
+  for (let from = 1; from <= height; from += CHUNK) {
+    const to = Math.min(from + CHUNK - 1, height);
+    const res = await apiFetch<{ coinbases?: CoinbaseRec[] }>(
+      `/private/coinbases/range/${from}/${to}`,
+    );
+    for (const cb of res.coinbases ?? []) {
+      if (cb.recipient_commitment === address) {
+        matches.push({
+          height: cb.height,
+          amount_atoms: cb.amount_atoms,
+          unlock_height: cb.unlock_height,
+        });
+        total += cb.amount_atoms;
+      }
+    }
+  }
+  matches.sort((a, b) => b.height - a.height);
+  return { address, total_amount_atoms: total, matches, blocks_scanned: height };
 }
 
 const isZokaAddress = (s: string) =>
