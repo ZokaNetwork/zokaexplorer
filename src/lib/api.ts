@@ -204,22 +204,23 @@ async function findPrivateTxInRecentBlocks(
   lookback = 256,
 ): Promise<{ blockHeight: number; blockHash?: string } | null> {
   const { height } = await apiFetch<{ height: number }>("/chain/height");
-  const from = Math.max(0, height - lookback + 1);
-  const range = await apiFetch<{
-    blocks?: Array<{ hash: string; height: number }>;
-  }>(`/blocks/range/${from}/${height}`);
-
-  for (const block of (range.blocks ?? []).slice().reverse()) {
+  const start = Math.max(1, height - lookback + 1);
+  const CHUNK = 1000;
+  // Search newest→oldest using the bulk private_tx_hashes range endpoint (one
+  // call per 1000 blocks) instead of one call per block.
+  for (let to = height; to >= start; to -= CHUNK) {
+    const from = Math.max(start, to - CHUNK + 1);
     try {
-      const privateData = await apiFetch<{
-        private_tx_hashes?: string[];
-      }>(`/blocks/${block.height}/private_tx_hashes`);
-      if ((privateData.private_tx_hashes ?? []).includes(hash)) {
-        return { blockHeight: block.height, blockHash: block.hash };
+      const range = await apiFetch<{
+        blocks?: Array<{ height: number; private_tx_hashes?: string[] }>;
+      }>(`/blocks/range/${from}/${to}/private_tx_hashes`);
+      for (const block of (range.blocks ?? []).slice().reverse()) {
+        if ((block.private_tx_hashes ?? []).includes(hash)) {
+          return { blockHeight: block.height };
+        }
       }
     } catch { /* keep scanning */ }
   }
-
   return null;
 }
 
@@ -507,6 +508,40 @@ export async function getTransaction(hash: string): Promise<Transaction | null> 
   } catch (e) {
     if (!(e instanceof ApiError) || e.status !== 404) throw e;
   }
+
+  // A private tx isn't on the public /transactions endpoint. If its hash is
+  // anchored in a mined block, report it CONFIRMED (parties/amount stay
+  // shielded) instead of leaving it stuck on "pending".
+  try {
+    const mined = await findPrivateTxInRecentBlocks(hash, 5000);
+    if (mined) {
+      const { height } = await apiFetch<{ height: number }>("/chain/height");
+      let timestamp = Date.now();
+      let blockHash = mined.blockHash ?? "";
+      try {
+        const block = await getBlock(mined.blockHeight);
+        if (block) {
+          timestamp = block.timestamp;
+          blockHash = block.hash;
+        }
+      } catch { /* timestamp/hash are best-effort */ }
+      return {
+        hash,
+        blockHeight: mined.blockHeight,
+        blockHash,
+        timestamp,
+        status: "confirmed",
+        amount: 0,
+        fee: 0,
+        from: "shielded",
+        to: "shielded",
+        ringSize: 0,
+        size: 0,
+        confirmations: Math.max(1, height - mined.blockHeight + 1),
+        proof: "",
+      };
+    }
+  } catch { /* best-effort; fall through to mempool / null */ }
 
   // Fallback: scan mempool for pending TXs not yet confirmed
   try {
