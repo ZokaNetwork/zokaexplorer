@@ -68,6 +68,19 @@ async function apiFetch<T>(path: string): Promise<T> {
   return promise;
 }
 
+// Cheap byte size of a resource via HEAD (Content-Length) — used to show a
+// private tx's size without downloading its (large) body.
+async function headContentLength(path: string): Promise<number> {
+  try {
+    await ensureNetworkConfigLoaded();
+    const res = await fetch(`${config.RPC_URL}${path}`, { method: "HEAD" });
+    const len = res.headers.get("content-length");
+    return len ? parseInt(len, 10) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
 async function fetchJsonWithRetries<T>(url: string): Promise<T> {
   let lastError: ApiError | null = null;
   for (let attempt = 0; attempt <= config.MAX_RETRIES; attempt++) {
@@ -525,6 +538,7 @@ export async function getTransaction(hash: string): Promise<Transaction | null> 
           blockHash = block.hash;
         }
       } catch { /* timestamp/hash are best-effort */ }
+      const size = await headContentLength(`/private/tx/${hash}`);
       return {
         hash,
         blockHeight: mined.blockHeight,
@@ -536,7 +550,7 @@ export async function getTransaction(hash: string): Promise<Transaction | null> 
         from: "shielded",
         to: "shielded",
         ringSize: 0,
-        size: 0,
+        size,
         confirmations: Math.max(1, height - mined.blockHeight + 1),
         proof: "",
       };
