@@ -3,7 +3,7 @@
   "networks": [
     {
       "id": "mainnet",
-      "label": "Mainnet",
+      "label": "Mainnet Zenith",
       "version": "v1.0.0",
       "rpc_url": "/rpc"
     }

@@ -32,9 +32,9 @@ const envRpcUrl = import.meta.env.DEV
 const NETWORKS: Record<NetworkId, NetworkConfig> = {
   mainnet: {
     id: "mainnet",
-    label: "Pre-Mainnet",
-    version: "v0.1.0",
-    badge: "Official mainnet launches 2026-06-30",
+    label: "Mainnet Zenith",
+    version: "v1.0.0",
+    badge: "Zenith",
     rpcUrl: envRpcUrl,
     get useMock() {
       return !this.rpcUrl;
