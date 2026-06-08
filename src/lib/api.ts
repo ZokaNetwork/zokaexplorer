@@ -4,7 +4,10 @@
 // When RPC_URL is empty → returns mock data for UI development.
 
 import { config, ensureNetworkConfigLoaded } from "./config";
-import initScanWasm, { derive_payment_address } from "./scan-wasm/zoka_scan_wasm.js";
+import initScanWasm, {
+  derive_payment_address,
+  scan_private_transaction,
+} from "./scan-wasm/zoka_scan_wasm.js";
 import scanWasmUrl from "./scan-wasm/zoka_scan_wasm_bg.wasm?url";
 import type {
   NetworkStats,
@@ -753,6 +756,28 @@ export async function scanPrivateAddress(
   throw new Error(SCAN_DISABLED_NOTICE);
 }
 
+interface PrivateTxHashRangeBlock {
+  height: number;
+  private_tx_hashes?: string[];
+}
+
+async function fetchConfirmedPrivateTxHashes(height: number): Promise<string[]> {
+  const hashes = new Set<string>();
+  const CHUNK = 1000;
+  for (let from = 1; from <= height; from += CHUNK) {
+    const to = Math.min(from + CHUNK - 1, height);
+    const res = await apiFetch<{ blocks?: PrivateTxHashRangeBlock[] }>(
+      `/blocks/range/${from}/${to}/private_tx_hashes`,
+    );
+    for (const block of res.blocks ?? []) {
+      for (const hash of block.private_tx_hashes ?? []) {
+        if (hash) hashes.add(hash);
+      }
+    }
+  }
+  return [...hashes];
+}
+
 export async function scanPrivateKey(scanKeyHex: string): Promise<PrivateViewScan> {
   await ensureNetworkConfigLoaded();
   const cleanKey = scanKeyHex.trim().replace(/^0x/i, "");
@@ -766,9 +791,52 @@ export async function scanPrivateKey(scanKeyHex: string): Promise<PrivateViewSca
       matches: [],
     };
   }
-  // Privacy: never send the scan key to the server (see scanPrivateAddress).
-  void cleanKey;
-  throw new Error(SCAN_DISABLED_NOTICE);
+  await ensureScanWasm();
+  let address: string;
+  try {
+    address = derive_payment_address(cleanKey);
+  } catch {
+    throw new Error("Scan key invÃ¡lida: debe ser hex de 16 o 32 bytes.");
+  }
+
+  const { height } = await apiFetch<{ height: number }>("/chain/height");
+  const hashes = await fetchConfirmedPrivateTxHashes(height);
+  const matches: PrivateViewScan["matches"] = [];
+  let scannedTransactions = 0;
+
+  const BATCH = 8;
+  for (let i = 0; i < hashes.length; i += BATCH) {
+    const batch = hashes.slice(i, i + BATCH);
+    const batchMatches = await Promise.all(
+      batch.map(async (hash) => {
+        try {
+          const tx = await apiFetch<Record<string, unknown>>(
+            `/private/tx/${encodeURIComponent(hash)}`,
+          );
+          scannedTransactions += 1;
+          const raw = scan_private_transaction(cleanKey, JSON.stringify(tx));
+          return (JSON.parse(raw) as PrivateViewScan).matches ?? [];
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 404) return [];
+          throw e;
+        }
+      }),
+    );
+    matches.push(...batchMatches.flat());
+  }
+
+  matches.sort((a, b) => b.timestamp - a.timestamp);
+  const total_amount_atoms = matches.reduce(
+    (total, item) => total + (Number.isFinite(item.amount) ? item.amount : 0),
+    0,
+  );
+  return {
+    address,
+    scanned_transactions: scannedTransactions,
+    matching_outputs: matches.length,
+    total_amount_atoms,
+    matches,
+  };
 }
 
 // ── Client-side mining-reward scan (privacy: key never leaves browser) ──

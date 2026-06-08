@@ -8,11 +8,20 @@
  */
 export function derive_payment_address(scan_key_hex: string): string;
 
+/**
+ * Scan one archived private transaction body using only a scan key.
+ *
+ * The input transaction body is public encrypted chain data. The scan key is
+ * used only inside this WASM module and never leaves the browser.
+ */
+export function scan_private_transaction(scan_key_hex: string, tx_json: string): string;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly derive_payment_address: (a: number, b: number) => [number, number, number, number];
+    readonly scan_private_transaction: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

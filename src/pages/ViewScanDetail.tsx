@@ -5,12 +5,20 @@ import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { scanMiningRewardsClientSide, type RewardScan } from "@/lib/api";
+import {
+  scanMiningRewardsClientSide,
+  scanPrivateKey,
+  type RewardScan,
+} from "@/lib/api";
+import type { PrivateViewScan } from "@/lib/types";
 
 const SESSION_SCAN_KEY = "zoka_scan_key_for_history";
 
 const formatZka = (atoms: number) =>
   (atoms / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 });
+
+const shortHash = (value: string) =>
+  value.length > 24 ? `${value.slice(0, 12)}...${value.slice(-10)}` : value;
 
 const cleanScanKey = (value: string) => value.trim().replace(/^0x/i, "");
 const isValidScanKey = (value: string) => /^[a-f0-9]{32}$|^[a-f0-9]{64}$/i.test(value);
@@ -23,24 +31,30 @@ const ViewScanDetail = () => {
       : "";
   const initialKey = stateKey || sessionStorage.getItem(SESSION_SCAN_KEY) || "";
   const [scanKey, setScanKey] = useState(initialKey);
-  const [scan, setScan] = useState<RewardScan | null>(null);
+  const [privateScan, setPrivateScan] = useState<PrivateViewScan | null>(null);
+  const [rewardScan, setRewardScan] = useState<RewardScan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const runScan = async (rawKey: string) => {
     setError(null);
-    setScan(null);
+    setPrivateScan(null);
+    setRewardScan(null);
     const cleanKey = cleanScanKey(rawKey);
     if (!isValidScanKey(cleanKey)) {
       setError("La scan private key debe ser hex de 16 o 32 bytes.");
       return;
     }
-    // The key stays in this tab only; it never goes to a server.
     sessionStorage.setItem(SESSION_SCAN_KEY, cleanKey);
     setScanKey(cleanKey);
     setLoading(true);
     try {
-      setScan(await scanMiningRewardsClientSide(cleanKey));
+      const [privateResult, rewardResult] = await Promise.all([
+        scanPrivateKey(cleanKey),
+        scanMiningRewardsClientSide(cleanKey),
+      ]);
+      setPrivateScan(privateResult);
+      setRewardScan(rewardResult);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "No se pudo escanear esta scan key.");
     } finally {
@@ -58,6 +72,10 @@ const ViewScanDetail = () => {
     event.preventDefault();
     void runScan(scanKey);
   };
+
+  const address = privateScan?.address || rewardScan?.address || "";
+  const totalTxAtoms = privateScan?.total_amount_atoms ?? 0;
+  const totalRewardAtoms = rewardScan?.total_amount_atoms ?? 0;
 
   return (
     <main className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
@@ -77,13 +95,12 @@ const ViewScanDetail = () => {
             <KeyRound className="h-8 w-8 text-signal" />
           </div>
 
-          <h1 className="mt-6 text-lg font-semibold text-foreground">Mining rewards by scan key</h1>
+          <h1 className="mt-6 text-lg font-semibold text-foreground">Scan key history</h1>
 
           <p className="mt-3 max-w-2xl text-xs leading-relaxed text-muted-foreground">
-            El escaneo corre <span className="text-foreground">100% en tu navegador</span>: la scan
-            key nunca sale de este dispositivo. Deriva tu dirección privada y la compara contra los
-            coinbases públicos de la cadena para encontrar tus recompensas de minería. (Las tx
-            privadas recibidas todavía no se listan acá — vé tu wallet para el balance completo.)
+            El escaneo corre <span className="text-foreground">100% en tu navegador</span>. La
+            scan key nunca se envia al nodo: el explorer descarga datos cifrados publicos y usa
+            WASM local para detectar tus outputs privados y recompensas de mineria.
           </p>
 
           <form onSubmit={onSubmit} className="mt-8 w-full rounded-xl border border-border bg-card p-6 text-left">
@@ -108,7 +125,7 @@ const ViewScanDetail = () => {
                   ) : (
                     <Eye className="mr-2 h-4 w-4" />
                   )}
-                  Escanear recompensas
+                  Escanear historial
                 </Button>
               </div>
             </div>
@@ -120,30 +137,107 @@ const ViewScanDetail = () => {
             </div>
           )}
 
-          {scan && (
+          {(privateScan || rewardScan) && (
+            <div className="mt-6 w-full rounded-xl border border-border bg-card text-left">
+              <div className="border-b border-border px-5 py-4">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Private outputs
+                    </p>
+                    <p className="mt-1 text-base font-semibold text-foreground">
+                      {privateScan?.matching_outputs ?? 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Private tx value
+                    </p>
+                    <p className="mt-1 text-base font-semibold text-signal">
+                      {formatZka(totalTxAtoms)} ZKA
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Mining rewards
+                    </p>
+                    <p className="mt-1 text-base font-semibold text-signal">
+                      {formatZka(totalRewardAtoms)} ZKA
+                    </p>
+                  </div>
+                </div>
+                {address && (
+                  <p className="font-mono-tight mt-4 break-all text-[11px] text-muted-foreground">
+                    {address}
+                  </p>
+                )}
+                <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <ShieldCheck className="h-3 w-3 text-signal" />
+                  Client-side WASM scan · key no enviada
+                </p>
+              </div>
+            </div>
+          )}
+
+          {privateScan && (
+            <div className="mt-6 w-full rounded-xl border border-border bg-card text-left">
+              <div className="border-b border-border px-5 py-4">
+                <p className="text-sm font-medium text-foreground">Private transaction outputs</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {privateScan.scanned_transactions} private tx archivadas escaneadas
+                </p>
+              </div>
+
+              {privateScan.matches.length > 0 ? (
+                <div className="divide-y divide-border">
+                  {privateScan.matches.map((item) => (
+                    <div key={`${item.tx_hash}:${item.output_id}`} className="px-5 py-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <Link
+                          to={`/record/private-tx/${encodeURIComponent(item.tx_hash)}`}
+                          className="font-mono-tight text-xs text-foreground hover:text-signal"
+                        >
+                          {shortHash(item.tx_hash)}
+                        </Link>
+                        <span className="text-sm font-semibold text-foreground">
+                          {formatZka(item.amount)} {item.asset_tag || "ZKA"}
+                        </span>
+                      </div>
+                      <div className="font-mono-tight mt-2 grid gap-1 text-[11px] text-muted-foreground sm:grid-cols-2">
+                        <span className="truncate">output {item.output_index}</span>
+                        <span className="truncate">commitment {shortHash(item.commitment)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-5 py-4 text-sm text-muted-foreground">
+                  No hay outputs privados para esta scan key en los cuerpos archivados por este nodo.
+                </div>
+              )}
+            </div>
+          )}
+
+          {rewardScan && (
             <div className="mt-6 w-full rounded-xl border border-border bg-card text-left">
               <div className="border-b border-border px-5 py-4">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm font-medium text-foreground">
-                    {scan.matches.length} coinbase(s) de minería
+                    {rewardScan.matches.length} coinbase(s) de mineria
                   </p>
                   <p className="text-base font-semibold text-signal">
-                    {formatZka(scan.total_amount_atoms)} ZKA
+                    {formatZka(rewardScan.total_amount_atoms)} ZKA
                   </p>
                 </div>
-                <p className="font-mono-tight mt-2 break-all text-[11px] text-muted-foreground">
-                  {scan.address}
-                </p>
-                <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <ShieldCheck className="h-3 w-3 text-signal" />
-                  Escaneado client-side · {scan.blocks_scanned.toLocaleString()} bloques · key no enviada
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  {rewardScan.blocks_scanned.toLocaleString()} bloques escaneados
                 </p>
               </div>
 
-              {scan.matches.length > 0 ? (
+              {rewardScan.matches.length > 0 ? (
                 <div className="divide-y divide-border">
-                  {scan.matches.map((item) => {
-                    const matured = scan.blocks_scanned >= item.unlock_height;
+                  {rewardScan.matches.map((item) => {
+                    const matured = rewardScan.blocks_scanned >= item.unlock_height;
                     return (
                       <div key={item.height} className="flex items-center justify-between px-5 py-4">
                         <Link
@@ -170,7 +264,7 @@ const ViewScanDetail = () => {
                 </div>
               ) : (
                 <div className="px-5 py-4 text-sm text-muted-foreground">
-                  No se encontraron coinbases de minería para esta scan key en la cadena.
+                  No se encontraron coinbases de mineria para esta scan key en la cadena.
                 </div>
               )}
             </div>
