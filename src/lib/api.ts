@@ -802,6 +802,49 @@ interface CoinbaseRec {
   unlock_height: number;
 }
 
+interface RawCoinbaseBlock {
+  header?: {
+    block_height?: number;
+  };
+  private_coinbase?: {
+    recipient_commitment?: string;
+    unlock_height?: number;
+  } | null;
+  transactions?: Array<{
+    amount?: number;
+  }>;
+}
+
+async function fetchCoinbaseRecords(from: number, to: number): Promise<CoinbaseRec[]> {
+  try {
+    const res = await apiFetch<{ coinbases?: CoinbaseRec[] }>(
+      `/private/coinbases/range/${from}/${to}`,
+    );
+    return res.coinbases ?? [];
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 404) throw e;
+  }
+
+  // Mainnet nodes deployed before the slim coinbase endpoint can still serve
+  // raw block ranges. Read only the public coinbase fields needed for matching.
+  const raw = await apiFetch<{ blocks?: RawCoinbaseBlock[] }>(
+    `/blocks/range/${from}/${to}/raw`,
+  );
+  return (raw.blocks ?? []).flatMap((block) => {
+    const cb = block.private_coinbase;
+    const height = block.header?.block_height;
+    if (!cb?.recipient_commitment || typeof height !== "number") return [];
+    return [
+      {
+        height,
+        recipient_commitment: cb.recipient_commitment,
+        amount_atoms: block.transactions?.[0]?.amount ?? 0,
+        unlock_height: cb.unlock_height ?? height,
+      },
+    ];
+  });
+}
+
 export async function scanMiningRewardsClientSide(scanKeyHex: string): Promise<RewardScan> {
   await ensureNetworkConfigLoaded();
   await ensureScanWasm();
@@ -817,10 +860,8 @@ export async function scanMiningRewardsClientSide(scanKeyHex: string): Promise<R
   const CHUNK = 1000;
   for (let from = 1; from <= height; from += CHUNK) {
     const to = Math.min(from + CHUNK - 1, height);
-    const res = await apiFetch<{ coinbases?: CoinbaseRec[] }>(
-      `/private/coinbases/range/${from}/${to}`,
-    );
-    for (const cb of res.coinbases ?? []) {
+    const coinbases = await fetchCoinbaseRecords(from, to);
+    for (const cb of coinbases) {
       if (cb.recipient_commitment === address) {
         matches.push({
           height: cb.height,

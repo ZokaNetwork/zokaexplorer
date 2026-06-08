@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { getSuggestions, isScanKeyLikeQuery, search } from "./api";
 
 const scanKeyHex =
-  "5093c55a2486b032c1a4ec1495527c86406541c4caca4d785c4302b86dafc9cd";
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 beforeEach(() => {
   vi.unstubAllGlobals();
