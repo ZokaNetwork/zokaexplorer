@@ -6,6 +6,11 @@ export interface NetworkConfig {
   version: string;
   badge?: string;
   rpcUrl: string;
+  // Secondary RPC node tried only when every retry against rpcUrl fails.
+  // Keeps the explorer up when the primary node (BOOT) has a momentary
+  // hiccup (restart, log cleanup, sync) — mirrors the primary+fallback
+  // setup the wallets (ZSilent/ZKAPriv) already use.
+  rpcUrlFallback?: string;
   useMock: boolean;
 }
 
@@ -15,6 +20,8 @@ type RuntimeNetwork = {
   version?: string;
   rpc_url?: string;
   rpcUrl?: string;
+  rpc_url_fallback?: string;
+  rpcUrlFallback?: string;
   badge?: string;
 };
 
@@ -23,11 +30,15 @@ type RuntimeConfig = {
   networks?: RuntimeNetwork[];
 };
 
-// In production always route through the Vercel proxy (/rpc → RPC node).
-// In dev, honour VITE_RPC_URL_MAINNET or fall back to the vite proxy.
+// In production always route through the Vercel proxy (/rpc → BOOT,
+// /rpc2 → VPS2 fallback). In dev, honour VITE_RPC_URL_MAINNET or fall
+// back to the vite proxy.
 const envRpcUrl = import.meta.env.DEV
   ? (import.meta.env.VITE_RPC_URL_MAINNET || import.meta.env.VITE_RPC_URL || "/rpc")
   : "/rpc";
+const envRpcUrlFallback = import.meta.env.DEV
+  ? (import.meta.env.VITE_RPC_URL_MAINNET_FALLBACK || "")
+  : "/rpc2";
 
 const NETWORKS: Record<NetworkId, NetworkConfig> = {
   mainnet: {
@@ -36,6 +47,7 @@ const NETWORKS: Record<NetworkId, NetworkConfig> = {
     version: "v1.0.0",
     badge: "Zenith",
     rpcUrl: envRpcUrl,
+    rpcUrlFallback: envRpcUrlFallback,
     get useMock() {
       return !this.rpcUrl;
     },
@@ -107,6 +119,8 @@ async function loadRuntimeNetworkConfig(): Promise<void> {
         version: network.version || NETWORKS[id].version,
         badge: network.badge,
         rpcUrl: network.rpc_url || network.rpcUrl || NETWORKS[id].rpcUrl,
+        rpcUrlFallback:
+          network.rpc_url_fallback || network.rpcUrlFallback || NETWORKS[id].rpcUrlFallback,
       };
     }
     if (runtime.active_network && NETWORKS[runtime.active_network]) {
@@ -122,6 +136,9 @@ async function loadRuntimeNetworkConfig(): Promise<void> {
 export const config = {
   get RPC_URL() {
     return getNetworkConfig().rpcUrl;
+  },
+  get RPC_URL_FALLBACK() {
+    return getNetworkConfig().rpcUrlFallback || "";
   },
   get useMock() {
     return getNetworkConfig().useMock;

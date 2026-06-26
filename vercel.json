@@ -5,6 +5,10 @@
       "destination": "http://159.223.119.216:3000/:path*"
     },
     {
+      "source": "/rpc2/:path*",
+      "destination": "http://157.230.5.103:3000/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

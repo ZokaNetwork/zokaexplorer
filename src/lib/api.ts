@@ -65,7 +65,7 @@ async function apiFetch<T>(path: string): Promise<T> {
     return cached.promise as Promise<T>;
   }
 
-  const promise = fetchJsonWithRetries<T>(url);
+  const promise = fetchJsonWithFailover<T>(path);
   readCache.set(url, { expiresAt: now + READ_CACHE_TTL_MS, promise });
   promise.catch(() => readCache.delete(url));
   return promise;
@@ -80,7 +80,15 @@ async function headContentLength(path: string): Promise<number> {
     const len = res.headers.get("content-length");
     return len ? parseInt(len, 10) || 0 : 0;
   } catch {
-    return 0;
+    const fallback = config.RPC_URL_FALLBACK;
+    if (!fallback || fallback === config.RPC_URL) return 0;
+    try {
+      const res = await fetch(`${fallback}${path}`, { method: "HEAD" });
+      const len = res.headers.get("content-length");
+      return len ? parseInt(len, 10) || 0 : 0;
+    } catch {
+      return 0;
+    }
   }
 }
 
@@ -99,9 +107,21 @@ async function fetchJsonWithRetries<T>(url: string): Promise<T> {
   throw lastError!;
 }
 
-async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  await ensureNetworkConfigLoaded();
-  const url = `${config.RPC_URL}${path}`;
+// Tries the primary RPC node (BOOT) with its full retry cycle; only falls
+// back to the secondary node (VPS2) once the primary is exhausted. Keeps the
+// explorer alive through a momentary primary-node hiccup (restart, log
+// cleanup, resync) instead of failing the whole page on a single bad node.
+async function fetchJsonWithFailover<T>(path: string): Promise<T> {
+  try {
+    return await fetchJsonWithRetries<T>(`${config.RPC_URL}${path}`);
+  } catch (err) {
+    const fallback = config.RPC_URL_FALLBACK;
+    if (!fallback || fallback === config.RPC_URL) throw err;
+    return await fetchJsonWithRetries<T>(`${fallback}${path}`);
+  }
+}
+
+async function postJsonOnce<T>(url: string, body: unknown): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.TIMEOUT_MS);
   try {
@@ -126,6 +146,17 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
     throw new ApiError(err.message ?? "Network error", undefined, true);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  await ensureNetworkConfigLoaded();
+  try {
+    return await postJsonOnce<T>(`${config.RPC_URL}${path}`, body);
+  } catch (err) {
+    const fallback = config.RPC_URL_FALLBACK;
+    if (!fallback || fallback === config.RPC_URL) throw err;
+    return await postJsonOnce<T>(`${fallback}${path}`, body);
   }
 }
 
