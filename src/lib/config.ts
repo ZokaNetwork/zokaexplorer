@@ -44,7 +44,7 @@ const NETWORKS: Record<NetworkId, NetworkConfig> = {
   mainnet: {
     id: "mainnet",
     label: "Mainnet Zenith",
-    version: "v1.0.0",
+    version: "v1.4.0",
     badge: "Zenith",
     rpcUrl: envRpcUrl,
     rpcUrlFallback: envRpcUrlFallback,
