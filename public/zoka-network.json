@@ -4,8 +4,9 @@
     {
       "id": "mainnet",
       "label": "Mainnet Zenith",
-      "version": "v1.4.0",
-      "rpc_url": "/rpc"
+      "version": "v1.5.0",
+      "rpc_url": "/rpc",
+      "rpc_url_fallback": "/rpc2"
     }
   ]
 }
