@@ -2,14 +2,14 @@
   "rewrites": [
     {
       "source": "/rpc/:path*",
-      "destination": "http://159.223.119.216/:path*"
+      "destination": "/api/rpc?__p=:path*"
     },
     {
       "source": "/rpc2/:path*",
-      "destination": "http://157.230.5.103/:path*"
+      "destination": "/api/rpc2?__p=:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|rpc/|rpc2/).*)",
       "destination": "/index.html"
     }
   ]

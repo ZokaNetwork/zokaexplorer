@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowUpRight,
   Box,
+  ChevronDown,
   CircleDot,
   Clock3,
   Hash,
@@ -76,6 +77,7 @@ const Index = () => {
   const [stats, setStats] = useState<NetworkStats | null>(null);
   const [recentBlocks, setRecentBlocks] = useState<ChainBlock[]>([]);
   const [privateActivity, setPrivateActivity] = useState<PrivateActivityItem[]>([]);
+  const [showPrivateActivity, setShowPrivateActivity] = useState(false);
   const [mempool, setMempool] = useState({ publicPending: 0, privatePending: 0 });
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -442,30 +444,45 @@ const Index = () => {
 
       {privateActivity.length > 0 && (
         <section className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-6">
-          <div className="flex items-center justify-between border-b border-border pb-2">
+          <button
+            type="button"
+            onClick={() => setShowPrivateActivity((v) => !v)}
+            aria-expanded={showPrivateActivity}
+            className="flex w-full items-center justify-between border-b border-border pb-2 text-left transition-colors hover:border-signal/40"
+          >
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
               <Lock className="h-3 w-3 text-signal" />
               Recent private activity
+              <span className="rounded-full bg-accent/40 px-1.5 py-0.5 font-mono-tight text-[9px] text-signal">
+                {privateActivity.length}
+              </span>
             </div>
-            <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
               hash + block only
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                  showPrivateActivity ? "rotate-180" : ""
+                }`}
+              />
             </div>
-          </div>
-          <div className="divide-y divide-border">
-            {privateActivity.map((item) => (
-              <Link
-                key={item.hash}
-                to={`/record/private-tx/${encodeURIComponent(item.hash)}`}
-                className="grid grid-cols-[64px_1fr_auto] items-center gap-3 py-3 text-sm transition-colors hover:bg-accent/20"
-              >
-                <span className="font-mono-tight text-signal">#{item.blockHeight.toLocaleString()}</span>
-                <span className="font-mono-tight truncate text-muted-foreground">
-                  {item.hash}
-                </span>
-                <span className="text-xs text-muted-foreground">view</span>
-              </Link>
-            ))}
-          </div>
+          </button>
+          {showPrivateActivity && (
+            <div className="divide-y divide-border">
+              {privateActivity.map((item) => (
+                <Link
+                  key={item.hash}
+                  to={`/record/private-tx/${encodeURIComponent(item.hash)}`}
+                  className="grid grid-cols-[64px_1fr_auto] items-center gap-3 py-3 text-sm transition-colors hover:bg-accent/20"
+                >
+                  <span className="font-mono-tight text-signal">#{item.blockHeight.toLocaleString()}</span>
+                  <span className="font-mono-tight truncate text-muted-foreground">
+                    {item.hash}
+                  </span>
+                  <span className="text-xs text-muted-foreground">view</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
