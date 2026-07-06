@@ -131,7 +131,7 @@ const SiteHeader = () => {
             New
           </span>
           <Download className="h-3.5 w-3.5 text-signal" />
-          <span>ZSilent 1.6.0</span>
+          <span>ZSilent 1.6.1</span>
         </a>
       </div>
 
@@ -159,7 +159,7 @@ const SiteHeader = () => {
                 New
               </span>
               <Download className="h-3.5 w-3.5 text-signal" />
-              <span>Download ZSilent 1.6.0</span>
+              <span>Download ZSilent 1.6.1</span>
             </a>
 
             <div className="px-2 pb-1 pt-1.5 text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
