@@ -359,7 +359,7 @@ const Index = () => {
           <DataFreshness publishedAt={stats?.publishedAt} className="normal-case tracking-normal" />
         </div>
 
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-6">
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-5">
           {metrics.map((metric, idx) => (
             <div key={metric.label} className="bg-card px-4 py-4">
               <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">

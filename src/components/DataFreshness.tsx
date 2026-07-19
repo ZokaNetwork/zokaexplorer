@@ -1,4 +1,4 @@
-import { Clock, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 /**
  * How old the published view is.
@@ -13,19 +13,26 @@ import { Clock, AlertTriangle } from "lucide-react";
  * and says so.
  */
 
-/** Past this, the view is called out as stale rather than merely timestamped. */
-const STALE_AFTER_MS = 20 * 60 * 1000;
+/**
+ * Past this, the view is called out rather than merely timestamped.
+ *
+ * Generous on purpose. Publishing runs every twenty minutes, so a warning at
+ * twenty minutes fired constantly during normal operation — and a warning that
+ * is usually on teaches people to ignore it. An hour means something is
+ * actually wrong.
+ */
+const STALE_AFTER_MS = 60 * 60 * 1000;
 
 const formatAge = (ms: number): string => {
   const mins = Math.floor(ms / 60000);
-  if (mins < 1) return "hace menos de un minuto";
-  if (mins === 1) return "hace 1 minuto";
-  if (mins < 60) return `hace ${mins} minutos`;
+  if (mins < 1) return "actualizado recién";
+  if (mins === 1) return "actualizado hace 1 minuto";
+  if (mins < 60) return `actualizado hace ${mins} minutos`;
   const hours = Math.floor(mins / 60);
-  if (hours === 1) return "hace 1 hora";
-  if (hours < 24) return `hace ${hours} horas`;
+  if (hours === 1) return "actualizado hace 1 hora";
+  if (hours < 24) return `actualizado hace ${hours} horas`;
   const days = Math.floor(hours / 24);
-  return days === 1 ? "hace 1 día" : `hace ${days} días`;
+  return days === 1 ? "actualizado hace 1 día" : `actualizado hace ${days} días`;
 };
 
 interface DataFreshnessProps {
@@ -39,28 +46,21 @@ const DataFreshness = ({ publishedAt, className = "" }: DataFreshnessProps) => {
   const age = Date.now() - publishedAt;
   const stale = age > STALE_AFTER_MS;
 
+  // Deliberately quiet. This was a bordered amber pill with a warning icon,
+  // which shouted that something was broken when the data was half an hour
+  // old — normal operation. Freshness is context, not an alert: it belongs in
+  // the margin at the weight of a caption, and only earns colour once it
+  // genuinely means something is wrong.
   return (
-    <div
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-light ${
-        stale
-          ? "border-amber-500/40 text-amber-500/90"
-          : "border-border text-muted-foreground"
+    <span
+      className={`inline-flex items-center gap-1.5 text-xs font-light ${
+        stale ? "text-amber-500/80" : "text-muted-foreground/60"
       } ${className}`}
       title={new Date(publishedAt).toLocaleString()}
     >
-      {stale ? (
-        <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-      ) : (
-        <Clock className="h-3.5 w-3.5" aria-hidden />
-      )}
-      {/* "Actualizado" rather than "Publicado": it is the word every explorer
-          uses and the one a visitor expects, without claiming the numbers are
-          being read live — which they are not. */}
-      <span>
-        {stale ? "Sin actualizar desde " : "Actualizado "}
-        {formatAge(age)}
-      </span>
-    </div>
+      {stale && <AlertTriangle className="h-3 w-3" aria-hidden />}
+      <span>{formatAge(age)}</span>
+    </span>
   );
 };
 
