@@ -18,6 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import SiteHeader from "@/components/SiteHeader";
 import DataFreshness from "@/components/DataFreshness";
 import { loadLastKnown, saveLastKnown } from "@/lib/lastKnown";
+import { setDataStatus } from "@/lib/dataStatus";
 import SiteFooter from "@/components/SiteFooter";
 import MetricSparkline from "@/components/MetricSparkline";
 import { getActiveNetwork, getNetworkConfig, onNetworkChange } from "@/lib/config";
@@ -143,12 +144,14 @@ const Index = () => {
         saveLastKnown(sample, blocks);
         failuresRef.current = 0;
         setDataUnavailable(false);
+        setDataStatus('live');
       } catch {
         // Keep the last good sample, but say so. Silently showing empty
         // metrics while the console fills with failed requests is the worst of
         // both: the page looks broken and never explains why.
         failuresRef.current += 1;
         if (failuresRef.current >= 2) setDataUnavailable(true);
+        setDataStatus(failuresRef.current >= 2 ? 'down' : 'stale');
       } finally {
         statsInFlightRef.current = false;
       }
@@ -370,17 +373,6 @@ const Index = () => {
           <DataFreshness publishedAt={stats?.publishedAt} className="normal-case tracking-normal" />
         </div>
 
-        {/* Only when there is genuinely nothing to show — a first visit while
-            the source happens to be unreachable. Once any sample has been
-            seen, the dashboard keeps showing it with its age, the way an
-            explorer should: a few minutes behind is normal, blank is not. */}
-        {dataUnavailable && !stats && (
-          <div className="mb-3 rounded-md border border-border px-4 py-3 text-sm font-light text-muted-foreground">
-            Loading network state… If this persists, the published view is
-            temporarily unreachable. The chain is unaffected — ZSilent reads
-            your own node directly.
-          </div>
-        )}
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-6">
           {metrics.map((metric, idx) => (
             <div key={metric.label} className="bg-card px-4 py-4">

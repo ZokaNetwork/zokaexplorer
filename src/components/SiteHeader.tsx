@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import LiveIndicator from "@/components/LiveIndicator";
 import { Link } from "react-router-dom";
 import { ChevronDown, Menu, X, Download } from "lucide-react";
 import {
@@ -118,7 +119,10 @@ const SiteHeader = () => {
         </div>
 
         <span className="h-4 w-px bg-border" />
-        <span className="font-mono-tight">{active.version}</span>
+        {/* The network version sat here. It told a visitor nothing about the
+            chain and went stale on every release; what they actually want to
+            know at a glance is whether the data is live. */}
+        <LiveIndicator />
 
         {/* Novedad: download the latest ZSilent */}
         <a
