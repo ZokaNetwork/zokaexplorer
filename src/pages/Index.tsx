@@ -128,7 +128,7 @@ const Index = () => {
         push("difficulty", sample.difficulty);
         push("hashrate", sample.hashrate);
         push("emission", sample.emission);
-        push("miners", sample.minersOnline ?? 0);
+        push("miners", (sample.connectedPeers ?? 0) + 1);
       } catch {
         // Keep the last good sample.
       } finally {
@@ -304,9 +304,16 @@ const Index = () => {
       history: pad(h.emission, stats?.emission ?? 0),
     },
     {
-      label: "Miners",
-      value: stats ? formatNumber(stats.minersOnline ?? 0) : "-",
-      history: pad(h.miners, stats?.minersOnline ?? 0),
+      // Nodes, not miners. Miner counts came from heartbeats to a central
+      // service that no longer exists, and they only ever counted the miners
+      // that chose to report. What is actually observable now is how many
+      // nodes the publishing node can see: its peers, plus itself.
+      //
+      // This is a floor, not a census — it is one node's view of the mesh, and
+      // nobody has the whole picture in a network with no central register.
+      label: "Nodes",
+      value: stats ? formatNumber((stats.connectedPeers ?? 0) + 1) : "-",
+      history: pad(h.miners, (stats?.connectedPeers ?? 0) + 1),
     },
   ];
   const activeNetwork = getNetworkConfig();
