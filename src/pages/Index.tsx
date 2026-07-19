@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import SiteHeader from "@/components/SiteHeader";
 import DataFreshness from "@/components/DataFreshness";
+import { loadLastKnown, saveLastKnown } from "@/lib/lastKnown";
 import SiteFooter from "@/components/SiteFooter";
 import MetricSparkline from "@/components/MetricSparkline";
 import { getActiveNetwork, getNetworkConfig, onNetworkChange } from "@/lib/config";
@@ -75,8 +76,10 @@ const TYPE_ICONS: Record<string, typeof Box> = {
 const Index = () => {
   const [query, setQuery] = useState("");
   const [blockHeightInput, setBlockHeightInput] = useState("");
-  const [stats, setStats] = useState<NetworkStats | null>(null);
-  const [recentBlocks, setRecentBlocks] = useState<ChainBlock[]>([]);
+  // Seed from the last known state so the dashboard is never blank on load.
+  const lastKnown = loadLastKnown();
+  const [stats, setStats] = useState<NetworkStats | null>(lastKnown?.stats ?? null);
+  const [recentBlocks, setRecentBlocks] = useState<ChainBlock[]>(lastKnown?.recentBlocks ?? []);
   const [privateActivity, setPrivateActivity] = useState<PrivateActivityItem[]>([]);
   const [showPrivateActivity, setShowPrivateActivity] = useState(false);
   const [mempool, setMempool] = useState({ publicPending: 0, privatePending: 0 });
@@ -137,6 +140,7 @@ const Index = () => {
         push("hashrate", sample.hashrate);
         push("emission", sample.emission);
         push("miners", (sample.connectedPeers ?? 0) + 1);
+        saveLastKnown(sample, blocks);
         failuresRef.current = 0;
         setDataUnavailable(false);
       } catch {
@@ -366,15 +370,15 @@ const Index = () => {
           <DataFreshness publishedAt={stats?.publishedAt} className="normal-case tracking-normal" />
         </div>
 
-        {dataUnavailable && (
-          <div className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm font-light text-amber-500/90">
-            <span className="font-medium">No published data yet.</span>{" "}
-            <span className="text-muted-foreground">
-              This explorer reads a static view that a node publishes on a
-              schedule; that view is currently unreachable, so the figures below
-              are blank rather than wrong. The chain itself is unaffected — for
-              live data with no intermediary, run ZSilent and read your own node.
-            </span>
+        {/* Only when there is genuinely nothing to show — a first visit while
+            the source happens to be unreachable. Once any sample has been
+            seen, the dashboard keeps showing it with its age, the way an
+            explorer should: a few minutes behind is normal, blank is not. */}
+        {dataUnavailable && !stats && (
+          <div className="mb-3 rounded-md border border-border px-4 py-3 text-sm font-light text-muted-foreground">
+            Loading network state… If this persists, the published view is
+            temporarily unreachable. The chain is unaffected — ZSilent reads
+            your own node directly.
           </div>
         )}
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-6">
