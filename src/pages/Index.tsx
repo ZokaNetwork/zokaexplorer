@@ -361,7 +361,18 @@ const Index = () => {
 
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-5">
           {metrics.map((metric, idx) => (
-            <div key={metric.label} className="bg-card px-4 py-4">
+            // Five metrics in a two-column phone layout leave the last one
+            // alone beside a hole, which reads as a broken grid. Let it span
+            // the row on small screens; the five-column desktop layout already
+            // fills exactly.
+            <div
+              key={metric.label}
+              className={`bg-card px-4 py-4 ${
+                idx === metrics.length - 1 && metrics.length % 2 === 1
+                  ? "col-span-2 md:col-span-1"
+                  : ""
+              }`}
+            >
               <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                 {metric.label}
               </div>
