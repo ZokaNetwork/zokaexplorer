@@ -53,8 +53,11 @@ const DataFreshness = ({ publishedAt, className = "" }: DataFreshnessProps) => {
       ) : (
         <Clock className="h-3.5 w-3.5" aria-hidden />
       )}
+      {/* "Actualizado" rather than "Publicado": it is the word every explorer
+          uses and the one a visitor expects, without claiming the numbers are
+          being read live — which they are not. */}
       <span>
-        {stale ? "Datos atrasados — publicados " : "Publicado "}
+        {stale ? "Sin actualizar desde " : "Actualizado "}
         {formatAge(age)}
       </span>
     </div>
