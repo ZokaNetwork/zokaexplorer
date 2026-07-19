@@ -15,6 +15,10 @@ export interface NetworkStats {
   minersOnline?: number;
   connectedPeers?: number;
   reportedHashrate?: number;
+  /** When the publishing node wrote this view (unix ms). The explorer reads a
+   *  published snapshot rather than a live RPC, so the UI shows this age
+   *  instead of implying the numbers are current. */
+  publishedAt?: number;
 }
 
 export interface Block {

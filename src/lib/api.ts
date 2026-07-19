@@ -303,6 +303,7 @@ export async function getNetworkStats(): Promise<NetworkStats> {
     connected_peers?: number;
     miners_online?: number;
     reported_hashrate_hps?: number;
+    published_at?: number;
   }>("/stats");
 
   return {
@@ -316,6 +317,7 @@ export async function getNetworkStats(): Promise<NetworkStats> {
     minersOnline: raw.miners_online ?? 0,
     connectedPeers: raw.connected_peers ?? 0,
     reportedHashrate: raw.reported_hashrate_hps ?? 0,
+    publishedAt: raw.published_at ? raw.published_at * 1000 : undefined,
   };
 }
 

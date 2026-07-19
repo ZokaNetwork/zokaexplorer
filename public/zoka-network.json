@@ -4,9 +4,9 @@
     {
       "id": "mainnet",
       "label": "Mainnet Zenith",
-      "version": "v1.6.1",
-      "rpc_url": "/rpc",
-      "rpc_url_fallback": "/rpc2"
+      "version": "v1.8.2",
+      "rpc_url": "https://zokanetwork.github.io/ZokaNetwork",
+      "rpc_url_fallback": ""
     }
   ]
 }

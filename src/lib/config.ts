@@ -30,15 +30,24 @@ type RuntimeConfig = {
   networks?: RuntimeNetwork[];
 };
 
-// In production always route through the Vercel proxy (/rpc → BOOT,
-// /rpc2 → VPS2 fallback). In dev, honour VITE_RPC_URL_MAINNET or fall
-// back to the vite proxy.
+// The explorer reads a published static view of the chain, not a live RPC.
+//
+// It used to proxy every request through a serverless function to a central
+// RPC host. That host was decommissioned, and the per-request function calls
+// are what exhausted the hosting plan — so the proxy died twice over. A node
+// now publishes plain JSON on a schedule and this reads the files.
+//
+// This is a *view*, not an authority: it carries a published_at timestamp so
+// the UI can show its age instead of implying it is live. For data with no
+// intermediary at all, run ZSilent and read your own node.
+const PUBLISHED_DATA_URL = "https://zokanetwork.github.io/ZokaNetwork";
+
 const envRpcUrl = import.meta.env.DEV
-  ? (import.meta.env.VITE_RPC_URL_MAINNET || import.meta.env.VITE_RPC_URL || "/rpc")
-  : "/rpc";
+  ? (import.meta.env.VITE_RPC_URL_MAINNET || import.meta.env.VITE_RPC_URL || PUBLISHED_DATA_URL)
+  : PUBLISHED_DATA_URL;
 const envRpcUrlFallback = import.meta.env.DEV
   ? (import.meta.env.VITE_RPC_URL_MAINNET_FALLBACK || "")
-  : "/rpc2";
+  : "";
 
 const NETWORKS: Record<NetworkId, NetworkConfig> = {
   mainnet: {

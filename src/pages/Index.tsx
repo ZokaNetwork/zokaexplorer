@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import SiteHeader from "@/components/SiteHeader";
+import DataFreshness from "@/components/DataFreshness";
 import SiteFooter from "@/components/SiteFooter";
 import MetricSparkline from "@/components/MetricSparkline";
 import { getActiveNetwork, getNetworkConfig, onNetworkChange } from "@/lib/config";
@@ -324,9 +325,12 @@ const Index = () => {
       <SiteHeader />
 
       <section className="relative z-10 mx-auto w-full max-w-5xl px-6 pt-4">
+        {/* This used to read "RPC linked", which is no longer true: there is no
+            RPC to link to. What matters now is how old the published view is,
+            so that a stalled publisher cannot look like a healthy one. */}
         <div className="mb-2 flex items-center justify-between gap-3 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
           <span>{activeNetwork.label} metrics</span>
-          <span>{activeNetwork.rpcUrl ? "RPC linked" : "mock mode"}</span>
+          <DataFreshness publishedAt={stats?.publishedAt} className="normal-case tracking-normal" />
         </div>
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-6">
           {metrics.map((metric, idx) => (
