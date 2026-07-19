@@ -84,6 +84,11 @@ const Index = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
   const [network, setNetwork] = useState(getActiveNetwork);
+  // The published view can be missing entirely — the publisher may not have run
+  // yet, or may be down. Saying so beats empty numbers and a console full of
+  // failed requests.
+  const [dataUnavailable, setDataUnavailable] = useState(false);
+  const failuresRef = useRef(0);
   const historyRef = useRef<Record<string, number[]>>({
     height: [],
     lastBlockAge: [],
@@ -103,6 +108,9 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
+
     const fetchStats = async () => {
       if (statsInFlightRef.current) return;
       statsInFlightRef.current = true;
@@ -129,15 +137,33 @@ const Index = () => {
         push("hashrate", sample.hashrate);
         push("emission", sample.emission);
         push("miners", (sample.connectedPeers ?? 0) + 1);
+        failuresRef.current = 0;
+        setDataUnavailable(false);
       } catch {
-        // Keep the last good sample.
+        // Keep the last good sample, but say so. Silently showing empty
+        // metrics while the console fills with failed requests is the worst of
+        // both: the page looks broken and never explains why.
+        failuresRef.current += 1;
+        if (failuresRef.current >= 2) setDataUnavailable(true);
       } finally {
         statsInFlightRef.current = false;
       }
+
+      // Back off when the source is down. Polling a dead endpoint every twenty
+      // seconds achieves nothing except a console no one can read.
+      if (!cancelled) {
+        const delay = failuresRef.current === 0
+          ? 20_000
+          : Math.min(20_000 * 2 ** failuresRef.current, 5 * 60_000);
+        timer = setTimeout(fetchStats, delay);
+      }
     };
+
     fetchStats();
-    const id = setInterval(fetchStats, 20000);
-    return () => clearInterval(id);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [network]);
 
   useEffect(() => {
@@ -339,6 +365,18 @@ const Index = () => {
           <span>{activeNetwork.label} metrics</span>
           <DataFreshness publishedAt={stats?.publishedAt} className="normal-case tracking-normal" />
         </div>
+
+        {dataUnavailable && (
+          <div className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm font-light text-amber-500/90">
+            <span className="font-medium">No published data yet.</span>{" "}
+            <span className="text-muted-foreground">
+              This explorer reads a static view that a node publishes on a
+              schedule; that view is currently unreachable, so the figures below
+              are blank rather than wrong. The chain itself is unaffected — for
+              live data with no intermediary, run ZSilent and read your own node.
+            </span>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-6">
           {metrics.map((metric, idx) => (
             <div key={metric.label} className="bg-card px-4 py-4">
